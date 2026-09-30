@@ -1,8 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    window::WindowEvent,
-    Manager,
+    Manager, WindowEvent,
 };
 
 mod locale;
