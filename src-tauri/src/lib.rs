@@ -5,6 +5,8 @@ use tauri::{
     Manager,
 };
 
+mod locale;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -14,14 +16,15 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
-            let show = MenuItem::with_id(app, "show", "显示桌宠", true, None::<&str>)?;
-            let hide = MenuItem::with_id(app, "hide", "隐藏桌宠", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let tray_locale = locale::load();
+            let show = MenuItem::with_id(app, "show", &tray_locale.show, true, None::<&str>)?;
+            let hide = MenuItem::with_id(app, "hide", &tray_locale.hide, true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", &tray_locale.quit, true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &hide, &quit])?;
 
             TrayIconBuilder::new()
                 .menu(&menu)
-                .tooltip("桌面桌宠")
+                .tooltip(&tray_locale.tooltip)
                 .on_menu_event(|app, event| {
                     if let Some(window) = app.get_webview_window("main") {
                         match event.id.as_ref() {

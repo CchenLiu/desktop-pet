@@ -13,6 +13,14 @@
 - Todo 创建与完成状态
 - Windows 深浅色跟随、减少动画开关
 - 预留 `.pet-skin` 外部皮肤协议，MVP 暂不实现导入 UI
+- 界面文案通过 `src/i18n` 管理，当前支持简体中文和 English
+- Rust 托盘文案通过 `src-tauri/locales` 管理，新增语言时无需修改托盘逻辑
+
+## 多语言入口
+
+Web UI 的语言字典位于 `src/i18n/zh-CN.ts` 与 `src/i18n/en-US.ts`，语言选择入口位于设置面板；新增语言时增加字典并在 `src/i18n/index.ts` 注册。
+
+Rust 托盘使用 `src-tauri/locales/zh-CN.json` 与 `src-tauri/locales/en-US.json`。当前可通过 `DESKTOP_PET_LOCALE=en-US` 选择原生托盘语言，后续可以把它与 Web UI 的设置持久化统一起来。
 
 ## 本地开发
 
@@ -24,4 +32,3 @@ npm run tauri:dev
 ```
 
 当前仓库只提交源代码骨架；真实构建与桌面运行需要在 Rust 工具链可用后验证。
-

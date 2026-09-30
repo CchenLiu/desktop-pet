@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "桌面桌宠",
+  "productName": "Desktop Pet",
   "version": "0.1.0",
   "identifier": "com.desktop-pet.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "桌面桌宠",
+        "title": "Desktop Pet",
         "width": 360,
         "height": 420,
         "minWidth": 280,
@@ -36,4 +36,3 @@
     "icon": []
   }
 }
-

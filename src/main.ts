@@ -1,10 +1,10 @@
 import "./styles.css";
 
 import { getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
+import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import {
   disable as disableAutostart,
   enable as enableAutostart,
-  isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
 import {
   isPermissionGranted,
@@ -18,7 +18,8 @@ type Pet = {
   id: string;
   name: string;
   emoji: string;
-  note: string;
+  nameKey: string;
+  noteKey: string;
   accent: string;
 };
 
@@ -44,10 +45,10 @@ type AppState = {
 };
 
 const pets: Pet[] = [
-  { id: "alaskan", name: "阿拉斯加", emoji: "🐺", note: "蓬松、可靠、喜欢陪你工作", accent: "#9c7b63" },
-  { id: "shepherd", name: "德国牧羊犬", emoji: "🐕", note: "警觉、聪明、负责提醒你休息", accent: "#9a6b42" },
-  { id: "siamese", name: "暹罗猫", emoji: "🐈", note: "优雅、黏人、偶尔傲娇", accent: "#ad8066" },
-  { id: "maine-coon", name: "缅因猫", emoji: "🐈‍⬛", note: "温柔、安静、体型大但桌宠很轻", accent: "#635d6e" },
+  { id: "alaskan", name: "alaskan", nameKey: "pets.alaskan.name", emoji: "🐺", noteKey: "pets.alaskan.note", accent: "#9c7b63" },
+  { id: "shepherd", name: "shepherd", nameKey: "pets.shepherd.name", emoji: "🐕", noteKey: "pets.shepherd.note", accent: "#9a6b42" },
+  { id: "siamese", name: "siamese", nameKey: "pets.siamese.name", emoji: "🐈", noteKey: "pets.siamese.note", accent: "#ad8066" },
+  { id: "maine-coon", name: "maine-coon", nameKey: "pets.maineCoon.name", emoji: "🐈‍⬛", noteKey: "pets.maineCoon.note", accent: "#635d6e" },
 ];
 
 const stateKey = "desktop-pet-state-v1";
@@ -90,16 +91,18 @@ let state = loadState();
 const saveState = () => localStorage.setItem(stateKey, JSON.stringify(state));
 const selectedPet = () => pets.find((pet) => pet.id === state.petId) ?? pets[0];
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const petLabel = (pet: Pet) => t(pet.nameKey);
+const petNote = (pet: Pet) => t(pet.noteKey);
 
 document.body.innerHTML = `
   <main class="app-shell">
     <section class="pet-stage" id="pet-stage">
       <div class="topbar">
         <span class="status-dot"></span>
-        <span id="status-label">陪伴中</span>
-        <button class="icon-button" id="settings-button" aria-label="打开设置">⚙</button>
+        <span id="status-label">${t("status.companion")}</span>
+        <button class="icon-button" id="settings-button" aria-label="${t("accessibility.openSettings")}">⚙</button>
       </div>
-      <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="和桌宠互动">
+      <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="${t("accessibility.interactWithPet")} ">
         <div class="pet-shadow"></div>
         <div class="pet-aura"></div>
         <div class="pet-emoji" id="pet-emoji"></div>
@@ -110,38 +113,40 @@ document.body.innerHTML = `
         <strong id="pet-name"></strong>
         <span id="pet-note"></span>
       </div>
-      <div class="speech-bubble" id="speech-bubble">今天也要记得喝水呀。</div>
+      <div class="speech-bubble" id="speech-bubble">${t("messages.defaultBubble")}</div>
       <div class="quick-actions">
-        <button class="action-button primary" id="drink-button">喝水 +250ml</button>
-        <button class="action-button" id="feed-button">喂食</button>
-        <button class="action-button" id="todo-button">Todo</button>
+        <button class="action-button primary" id="drink-button">${t("actions.drink")}</button>
+        <button class="action-button" id="feed-button">${t("actions.feed")}</button>
+        <button class="action-button" id="todo-button">${t("actions.todo")}</button>
       </div>
       <div class="progress-card">
-        <div class="progress-heading"><span>今日饮水</span><strong id="water-label"></strong></div>
+        <div class="progress-heading"><span>${t("hydration.title")}</span><strong id="water-label"></strong></div>
         <div class="progress-track"><div class="progress-value" id="water-progress"></div></div>
-        <div class="progress-foot"><span id="water-remaining"></span><span>目标可在设置中调整</span></div>
+        <div class="progress-foot"><span id="water-remaining"></span><span>${t("hydration.targetHint")}</span></div>
       </div>
     </section>
     <aside class="settings-panel hidden" id="settings-panel">
-      <div class="panel-heading"><div><span class="eyebrow">DESKTOP PET</span><h1>设置</h1></div><button class="icon-button" id="close-settings">×</button></div>
-      <label class="field-label" for="pet-select">桌宠形象</label>
+      <div class="panel-heading"><div><span class="eyebrow">DESKTOP PET</span><h1>${t("settings.title")}</h1></div><button class="icon-button" id="close-settings">×</button></div>
+      <label class="field-label" for="pet-select">${t("settings.petAppearance")}</label>
       <select class="field" id="pet-select"></select>
-      <label class="field-label" for="scale-input">桌宠尺寸 <span id="scale-label"></span></label>
+      <label class="field-label" for="scale-input">${t("settings.petSize")} <span id="scale-label"></span></label>
       <input class="range" id="scale-input" type="range" min="0.6" max="2.2" step="0.1" />
-      <div class="setting-row"><span>始终置顶</span><input id="always-top-input" type="checkbox" /></div>
-      <div class="setting-row"><span>开机自启 <small>默认关闭</small></span><input id="autostart-input" type="checkbox" /></div>
-      <div class="setting-row"><span>减少动画</span><input id="reduce-motion-input" type="checkbox" /></div>
+      <div class="setting-row"><span>${t("settings.alwaysOnTop")}</span><input id="always-top-input" type="checkbox" /></div>
+      <div class="setting-row"><span>${t("settings.autostart")} <small>${t("settings.autostartHint")}</small></span><input id="autostart-input" type="checkbox" /></div>
+      <div class="setting-row"><span>${t("settings.reduceMotion")}</span><input id="reduce-motion-input" type="checkbox" /></div>
+      <label class="field-label" for="language-input">${t("settings.language")}</label>
+      <select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select>
       <div class="section-divider"></div>
-      <label class="field-label" for="target-input">每日饮水目标（ml）</label>
+      <label class="field-label" for="target-input">${t("hydration.dailyTarget")}</label>
       <input class="field" id="target-input" type="number" min="200" max="5000" step="50" />
-      <label class="field-label" for="reminder-mode-input">提醒方式</label>
-      <select class="field" id="reminder-mode-input"><option value="interval">按间隔提醒</option><option value="fixed">固定时间提醒</option></select>
-      <label class="field-label" for="reminder-value-input" id="reminder-value-label">间隔分钟</label>
+      <label class="field-label" for="reminder-mode-input">${t("reminders.mode")}</label>
+      <select class="field" id="reminder-mode-input"><option value="interval">${t("reminders.intervalOption")}</option><option value="fixed">${t("reminders.fixedOption")}</option></select>
+      <label class="field-label" for="reminder-value-input" id="reminder-value-label">${t("reminders.intervalLabel")}</label>
       <input class="field" id="reminder-value-input" type="text" inputmode="numeric" />
-      <div class="panel-tip">提醒会在桌宠隐藏时继续运行；退出应用后停止。</div>
+      <div class="panel-tip">${t("settings.reminderTip")}</div>
       <div class="section-divider"></div>
-      <div class="panel-heading compact"><div><span class="eyebrow">TODO</span><h2>今日待办</h2></div></div>
-      <div class="todo-create"><input class="field" id="todo-input" placeholder="写下一件小事" /><button class="add-button" id="add-todo">+</button></div>
+      <div class="panel-heading compact"><div><span class="eyebrow">TODO</span><h2>${t("todo.title")}</h2></div></div>
+      <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}">+</button></div>
       <div class="todo-list" id="todo-list"></div>
     </aside>
   </main>
@@ -162,10 +167,10 @@ const render = () => {
   const pet = selectedPet();
   const progress = Math.min(100, (state.waterDone / state.dailyTarget) * 100);
   byId<HTMLElement>("pet-emoji").textContent = pet.emoji;
-  byId<HTMLElement>("pet-name").textContent = pet.name;
-  byId<HTMLElement>("pet-note").textContent = pet.note;
+  byId<HTMLElement>("pet-name").textContent = petLabel(pet);
+  byId<HTMLElement>("pet-note").textContent = petNote(pet);
   byId<HTMLElement>("water-label").textContent = `${state.waterDone} / ${state.dailyTarget} ml`;
-  byId<HTMLElement>("water-remaining").textContent = state.waterDone >= state.dailyTarget ? "今日目标完成" : `还差 ${state.dailyTarget - state.waterDone} ml`;
+  byId<HTMLElement>("water-remaining").textContent = state.waterDone >= state.dailyTarget ? t("hydration.goalDone") : t("hydration.remaining", { amount: state.dailyTarget - state.waterDone });
   byId<HTMLElement>("water-progress").style.width = `${progress}%`;
   byId<HTMLSelectElement>("pet-select").value = state.petId;
   byId<HTMLInputElement>("scale-input").value = String(state.scale);
@@ -176,7 +181,8 @@ const render = () => {
   byId<HTMLInputElement>("target-input").value = String(state.dailyTarget);
   byId<HTMLSelectElement>("reminder-mode-input").value = state.reminderMode;
   byId<HTMLInputElement>("reminder-value-input").value = state.reminderValue;
-  byId<HTMLElement>("reminder-value-label").textContent = state.reminderMode === "interval" ? "间隔分钟" : "固定时间（HH:MM）";
+  byId<HTMLElement>("reminder-value-label").textContent = state.reminderMode === "interval" ? t("reminders.intervalLabel") : t("reminders.fixedLabel");
+  byId<HTMLSelectElement>("language-input").value = getLocale();
   document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
   document.documentElement.style.setProperty("--pet-accent", pet.accent);
   renderTodos();
@@ -186,12 +192,13 @@ const renderTodos = () => {
   const list = byId<HTMLElement>("todo-list");
   list.innerHTML = state.todos.length
     ? state.todos.map((todo) => `<label class="todo-item ${todo.done ? "done" : ""}"><input type="checkbox" data-todo="${todo.id}" ${todo.done ? "checked" : ""}/><span>${escapeHtml(todo.title)}</span></label>`).join("")
-    : '<div class="empty-state">今天还没有 Todo</div>';
+    : `<div class="empty-state">${t("todo.empty")}</div>`;
 };
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
 
 const applyWindowSettings = async () => {
+  await appWindow.setTitle(t("app.title"));
   await appWindow.setAlwaysOnTop(state.alwaysOnTop);
   await appWindow.setSize(new LogicalSize(360 * state.scale, 420 * state.scale));
   if (state.position) {
@@ -217,7 +224,7 @@ const recordWater = (amount: number) => {
   state.waterDone = Math.min(state.dailyTarget, state.waterDone + amount);
   saveState();
   render();
-  showMessage(state.waterDone >= state.dailyTarget ? "今天的饮水目标完成啦！" : "很好，喝水完成，继续保持。 ");
+  showMessage(state.waterDone >= state.dailyTarget ? t("messages.hydrationGoalDone") : t("messages.hydrationRecorded"));
   petStage.classList.remove("celebrate");
   requestAnimationFrame(() => petStage.classList.add("celebrate"));
 };
@@ -228,7 +235,7 @@ const notify = async (title: string, body: string) => {
     if (!granted) granted = (await requestPermission()) === "granted";
     if (granted) sendNotification({ title, body });
   } catch {
-    showMessage("系统通知暂不可用，我会继续在桌宠里提醒你。");
+    showMessage(t("messages.notificationUnavailable"));
   }
 };
 
@@ -247,8 +254,8 @@ const checkReminder = () => {
   }
   if (due && lastReminderStamp !== stamp && state.waterDone < state.dailyTarget) {
     lastReminderStamp = stamp;
-    showMessage("该喝水啦，完成后点一下喝水按钮。");
-    void notify("喝水提醒", `今天已完成 ${state.waterDone} / ${state.dailyTarget} ml`);
+    showMessage(t("messages.reminder"));
+    void notify(t("actions.drink"), t("messages.notificationBody", { done: state.waterDone, target: state.dailyTarget }));
   }
 };
 
@@ -261,7 +268,7 @@ const updateAutostart = async (enabled: boolean) => {
   } catch {
     state.autostart = false;
     byId<HTMLInputElement>("autostart-input").checked = false;
-    showMessage("开机自启需要安装后的应用环境，当前先保留设置。");
+    showMessage(t("messages.autostartUnavailable"));
   }
 };
 
@@ -273,16 +280,16 @@ const addTodo = () => {
   input.value = "";
   saveState();
   renderTodos();
-  showMessage("已记下这件小事。 ");
+  showMessage(t("messages.todoAdded"));
 };
 
-byId<HTMLSelectElement>("pet-select").innerHTML = pets.map((pet) => `<option value="${pet.id}">${pet.emoji} ${pet.name}</option>`).join("");
+byId<HTMLSelectElement>("pet-select").innerHTML = pets.map((pet) => `<option value="${pet.id}">${pet.emoji} ${petLabel(pet)}</option>`).join("");
 byId("settings-button").addEventListener("click", () => settingsPanel.classList.remove("hidden"));
 byId("close-settings").addEventListener("click", () => settingsPanel.classList.add("hidden"));
 byId("drink-button").addEventListener("click", () => recordWater(250));
-byId("feed-button").addEventListener("click", () => showMessage("谢谢投喂！我会乖乖陪着你。"));
+byId("feed-button").addEventListener("click", () => showMessage(t("messages.feed")));
 byId("todo-button").addEventListener("click", () => settingsPanel.classList.remove("hidden"));
-petSurface.addEventListener("click", () => showMessage("摸摸我！今天也一起专注一下。"));
+petSurface.addEventListener("click", () => showMessage(t("messages.petInteraction")));
 petSurface.addEventListener("pointerdown", async (event) => {
   if (event.button === 0) await appWindow.startDragging();
 });
@@ -292,7 +299,7 @@ byId<HTMLSelectElement>("pet-select").addEventListener("change", (event) => {
   state.petId = (event.target as HTMLSelectElement).value;
   saveState();
   render();
-  showMessage(`换成${selectedPet().name}啦。`);
+  showMessage(t("messages.petChanged", { pet: petLabel(selectedPet()) }));
 });
 byId<HTMLInputElement>("scale-input").addEventListener("input", async (event) => {
   state.scale = Number((event.target as HTMLInputElement).value);
@@ -310,6 +317,10 @@ byId<HTMLInputElement>("reduce-motion-input").addEventListener("change", (event)
   state.reduceMotion = (event.target as HTMLInputElement).checked;
   saveState();
   render();
+});
+byId<HTMLSelectElement>("language-input").addEventListener("change", (event) => {
+  setLocale((event.target as HTMLSelectElement).value as Locale);
+  window.location.reload();
 });
 byId<HTMLInputElement>("target-input").addEventListener("change", (event) => {
   state.dailyTarget = Math.max(200, Math.min(5000, Number((event.target as HTMLInputElement).value) || 1600));
