@@ -15,6 +15,8 @@
 - 预留 `.pet-skin` 外部皮肤协议，MVP 暂不实现导入 UI
 - 界面文案通过 `src/i18n` 管理，当前支持简体中文和 English
 - Rust 托盘文案通过 `src-tauri/locales` 管理，新增语言时无需修改托盘逻辑
+- 最新角色概念稿位于 `assets/concepts/pet-character-concept-v1.png`
+- 动画资源生产规范位于 `docs/animation-asset-pipeline.md`
 
 ## 多语言入口
 
