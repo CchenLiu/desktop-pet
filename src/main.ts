@@ -1,83 +1,150 @@
 import "./styles.css";
 
-import { getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
-import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
+import {
+  availableMonitors,
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+  primaryMonitor,
+} from "@tauri-apps/api/window";
 import {
   disable as disableAutostart,
   enable as enableAutostart,
+  isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
 import {
   isPermissionGranted,
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
+import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
+import type { PetAction, PetSkinManifest } from "./pet-skin";
 
 type ReminderMode = "interval" | "fixed";
+type TargetMode = "guideline" | "custom";
+type GuidelineProfile = "female" | "male";
 
 type Pet = {
   id: string;
-  name: string;
-  emoji: string;
   nameKey: string;
   noteKey: string;
   accent: string;
+  portrait: string;
+  skin: PetSkinManifest;
 };
 
 type Todo = {
   id: string;
   title: string;
+  remindAt: string;
   done: boolean;
+  notified: boolean;
 };
 
 type AppState = {
+  version: 2;
   petId: string;
-  scale: number;
+  petSize: number;
   alwaysOnTop: boolean;
   autostart: boolean;
   reduceMotion: boolean;
-  reminderMode: ReminderMode;
-  reminderValue: string;
-  dailyTarget: number;
+  targetMode: TargetMode;
+  guidelineProfile: GuidelineProfile;
+  customTarget: number;
   waterDone: number;
   waterDate: string;
+  reminderMode: ReminderMode;
+  reminderValue: string;
+  lastHydrationReminderAt: number;
+  lastHydrationReminderKey: string;
   todos: Todo[];
   position?: { x: number; y: number };
 };
 
+const portrait = (id: string) => new URL(`./assets/pets/${id}/portrait.png`, import.meta.url).href;
+const skin = (id: string): PetSkinManifest => ({
+  schemaVersion: 1,
+  id: `${id}-default`,
+  name: id,
+  canvas: { width: 512, height: 512 },
+  anchor: { x: 0.5, y: 0.96 },
+  preview: portrait(id),
+  animations: {},
+});
+
 const pets: Pet[] = [
-  { id: "alaskan", name: "alaskan", nameKey: "pets.alaskan.name", emoji: "🐺", noteKey: "pets.alaskan.note", accent: "#9c7b63" },
-  { id: "shepherd", name: "shepherd", nameKey: "pets.shepherd.name", emoji: "🐕", noteKey: "pets.shepherd.note", accent: "#9a6b42" },
-  { id: "siamese", name: "siamese", nameKey: "pets.siamese.name", emoji: "🐈", noteKey: "pets.siamese.note", accent: "#ad8066" },
-  { id: "maine-coon", name: "maine-coon", nameKey: "pets.maineCoon.name", emoji: "🐈‍⬛", noteKey: "pets.maineCoon.note", accent: "#635d6e" },
+  { id: "alaskan", nameKey: "pets.alaskan.name", noteKey: "pets.alaskan.note", accent: "#8a756a", portrait: portrait("alaskan"), skin: skin("alaskan") },
+  { id: "shepherd", nameKey: "pets.shepherd.name", noteKey: "pets.shepherd.note", accent: "#a76b32", portrait: portrait("shepherd"), skin: skin("shepherd") },
+  { id: "siamese", nameKey: "pets.siamese.name", noteKey: "pets.siamese.note", accent: "#6e8fb8", portrait: portrait("siamese"), skin: skin("siamese") },
+  { id: "maine-coon", nameKey: "pets.maineCoon.name", noteKey: "pets.maineCoon.note", accent: "#8c6d4f", portrait: portrait("maine-coon"), skin: skin("maine-coon") },
 ];
 
-const stateKey = "desktop-pet-state-v1";
+const stateKey = "desktop-pet-state-v2";
+const legacyStateKey = "desktop-pet-state-v1";
 const appWindow = getCurrentWindow();
 let reminderTimer: number | undefined;
-let lastReminderStamp = "";
+let actionTimer: number | undefined;
+let messageTimer: number | undefined;
+let panelOpen = false;
+let currentAction: PetAction = "idle";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const localDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const toLocalDateTimeInput = (date: Date) => {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${localDateKey(date)}T${hours}:${minutes}`;
+};
 
 const defaultState = (): AppState => ({
+  version: 2,
   petId: pets[0].id,
-  scale: 1,
+  petSize: 72,
   alwaysOnTop: true,
   autostart: false,
   reduceMotion: false,
+  targetMode: "guideline",
+  guidelineProfile: "female",
+  customTarget: 1600,
+  waterDone: 0,
+  waterDate: localDateKey(),
   reminderMode: "interval",
   reminderValue: "60",
-  dailyTarget: 1600,
-  waterDone: 0,
-  waterDate: today(),
+  lastHydrationReminderAt: Date.now(),
+  lastHydrationReminderKey: "",
   todos: [],
+});
+
+const normalizeTodo = (todo: Partial<Todo>): Todo => ({
+  id: todo.id ?? crypto.randomUUID(),
+  title: String(todo.title ?? ""),
+  remindAt: String(todo.remindAt ?? ""),
+  done: Boolean(todo.done),
+  notified: Boolean(todo.notified),
 });
 
 const loadState = (): AppState => {
   try {
-    const stored = JSON.parse(localStorage.getItem(stateKey) ?? "null") as Partial<AppState> | null;
-    const next = { ...defaultState(), ...stored };
-    if (next.waterDate !== today()) {
-      next.waterDate = today();
+    const current = JSON.parse(localStorage.getItem(stateKey) ?? "null") as Partial<AppState> | null;
+    const legacy = JSON.parse(localStorage.getItem(legacyStateKey) ?? "null") as ({ scale?: number; dailyTarget?: number; todos?: Partial<Todo>[] } & Partial<AppState>) | null;
+    const stored = current ?? legacy;
+    if (!stored) return defaultState();
+    const next: AppState = {
+      ...defaultState(),
+      ...stored,
+      version: 2,
+      petSize: "petSize" in stored ? Number(stored.petSize) : Math.round(72 * Number(legacy?.scale ?? 1)),
+      customTarget: "customTarget" in stored ? Number(stored.customTarget) : Number(legacy?.dailyTarget ?? 1600),
+      todos: (stored.todos ?? []).map(normalizeTodo),
+    };
+    next.petSize = Math.max(48, Math.min(144, next.petSize || 72));
+    if (next.waterDate !== localDateKey()) {
+      next.waterDate = localDateKey();
       next.waterDone = 0;
     }
     return next;
@@ -90,64 +157,72 @@ let state = loadState();
 
 const saveState = () => localStorage.setItem(stateKey, JSON.stringify(state));
 const selectedPet = () => pets.find((pet) => pet.id === state.petId) ?? pets[0];
+const targetAmount = () => state.targetMode === "custom"
+  ? Math.max(200, Math.min(5000, state.customTarget))
+  : state.guidelineProfile === "male" ? 1700 : 1500;
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const petLabel = (pet: Pet) => t(pet.nameKey);
-const petNote = (pet: Pet) => t(pet.noteKey);
+const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
 
 document.body.innerHTML = `
-  <main class="app-shell">
-    <section class="pet-stage" id="pet-stage">
-      <div class="topbar">
-        <span class="status-dot"></span>
-        <span id="status-label">${t("status.companion")}</span>
-        <button class="icon-button" id="settings-button" aria-label="${t("accessibility.openSettings")}">⚙</button>
-      </div>
-      <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="${t("accessibility.interactWithPet")} ">
+  <main class="app-shell" id="app-shell">
+    <section class="pet-stage" id="pet-stage" data-action="idle">
+      <div class="speech-bubble" id="speech-bubble" role="status">${t("messages.defaultBubble")}</div>
+      <button class="settings-trigger" id="settings-button" aria-label="${t("accessibility.openSettings")}">⚙</button>
+      <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="${t("accessibility.interactWithPet")}">
         <div class="pet-shadow"></div>
         <div class="pet-aura"></div>
-        <div class="pet-emoji" id="pet-emoji"></div>
-        <div class="pet-spark spark-one">✦</div>
-        <div class="pet-spark spark-two">·</div>
+        <img class="pet-image" id="pet-image" alt="" draggable="false" />
+        <span class="action-prop" id="action-prop" aria-hidden="true"></span>
       </div>
-      <div class="pet-caption">
-        <strong id="pet-name"></strong>
-        <span id="pet-note"></span>
-      </div>
-      <div class="speech-bubble" id="speech-bubble">${t("messages.defaultBubble")}</div>
-      <div class="quick-actions">
-        <button class="action-button primary" id="drink-button">${t("actions.drink")}</button>
-        <button class="action-button" id="feed-button">${t("actions.feed")}</button>
-        <button class="action-button" id="todo-button">${t("actions.todo")}</button>
-      </div>
-      <div class="progress-card">
-        <div class="progress-heading"><span>${t("hydration.title")}</span><strong id="water-label"></strong></div>
-        <div class="progress-track"><div class="progress-value" id="water-progress"></div></div>
-        <div class="progress-foot"><span id="water-remaining"></span><span>${t("hydration.targetHint")}</span></div>
+      <div class="quick-actions" id="quick-actions">
+        <button class="quick-button" id="drink-button" aria-label="${t("actions.drink")}">💧</button>
+        <button class="quick-button" id="feed-button" aria-label="${t("actions.feed")}">🍪</button>
+        <button class="quick-button" id="todo-button" aria-label="${t("actions.todo")}">✓</button>
       </div>
     </section>
-    <aside class="settings-panel hidden" id="settings-panel">
-      <div class="panel-heading"><div><span class="eyebrow">DESKTOP PET</span><h1>${t("settings.title")}</h1></div><button class="icon-button" id="close-settings">×</button></div>
-      <label class="field-label" for="pet-select">${t("settings.petAppearance")}</label>
-      <select class="field" id="pet-select"></select>
-      <label class="field-label" for="scale-input">${t("settings.petSize")} <span id="scale-label"></span></label>
-      <input class="range" id="scale-input" type="range" min="0.6" max="2.2" step="0.1" />
-      <div class="setting-row"><span>${t("settings.alwaysOnTop")}</span><input id="always-top-input" type="checkbox" /></div>
-      <div class="setting-row"><span>${t("settings.autostart")} <small>${t("settings.autostartHint")}</small></span><input id="autostart-input" type="checkbox" /></div>
-      <div class="setting-row"><span>${t("settings.reduceMotion")}</span><input id="reduce-motion-input" type="checkbox" /></div>
-      <label class="field-label" for="language-input">${t("settings.language")}</label>
-      <select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select>
-      <div class="section-divider"></div>
-      <label class="field-label" for="target-input">${t("hydration.dailyTarget")}</label>
-      <input class="field" id="target-input" type="number" min="200" max="5000" step="50" />
-      <label class="field-label" for="reminder-mode-input">${t("reminders.mode")}</label>
-      <select class="field" id="reminder-mode-input"><option value="interval">${t("reminders.intervalOption")}</option><option value="fixed">${t("reminders.fixedOption")}</option></select>
-      <label class="field-label" for="reminder-value-input" id="reminder-value-label">${t("reminders.intervalLabel")}</label>
-      <input class="field" id="reminder-value-input" type="text" inputmode="numeric" />
-      <div class="panel-tip">${t("settings.reminderTip")}</div>
-      <div class="section-divider"></div>
-      <div class="panel-heading compact"><div><span class="eyebrow">TODO</span><h2>${t("todo.title")}</h2></div></div>
-      <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}">+</button></div>
-      <div class="todo-list" id="todo-list"></div>
+    <aside class="settings-panel" id="settings-panel" aria-hidden="true">
+      <header class="panel-heading">
+        <div><span class="eyebrow">${t("settings.companionLabel")}</span><h1>${t("settings.title")}</h1></div>
+        <button class="icon-button" id="close-settings" aria-label="${t("accessibility.closeSettings")}">×</button>
+      </header>
+      <section class="panel-section">
+        <label class="field-label" for="pet-select">${t("settings.petAppearance")}</label>
+        <select class="field" id="pet-select"></select>
+        <label class="field-label" for="size-input"><span>${t("settings.petSize")}</span><span id="size-label"></span></label>
+        <input class="range" id="size-input" type="range" min="48" max="144" step="4" />
+        <div class="setting-row"><span>${t("settings.alwaysOnTop")}</span><input id="always-top-input" type="checkbox" /></div>
+        <div class="setting-row"><span>${t("settings.autostart")} <small>${t("settings.autostartHint")}</small></span><input id="autostart-input" type="checkbox" /></div>
+        <div class="setting-row"><span>${t("settings.reduceMotion")}</span><input id="reduce-motion-input" type="checkbox" /></div>
+        <label class="field-label" for="language-input">${t("settings.language")}</label>
+        <select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select>
+      </section>
+      <section class="panel-section">
+        <div class="section-heading"><div><span class="eyebrow">${t("hydration.eyebrow")}</span><h2>${t("hydration.title")}</h2></div><strong id="water-label"></strong></div>
+        <div class="progress-track"><div class="progress-value" id="water-progress"></div></div>
+        <div class="progress-foot"><span id="water-remaining"></span><button id="panel-drink-button">${t("actions.drink")}</button></div>
+        <label class="field-label" for="target-mode-input">${t("hydration.targetMode")}</label>
+        <select class="field" id="target-mode-input"><option value="guideline">${t("hydration.guidelineMode")}</option><option value="custom">${t("hydration.customMode")}</option></select>
+        <div id="guideline-fields">
+          <label class="field-label" for="guideline-profile-input">${t("hydration.guidelineProfile")}</label>
+          <select class="field" id="guideline-profile-input"><option value="female">${t("hydration.adultFemale")}</option><option value="male">${t("hydration.adultMale")}</option></select>
+          <p class="panel-tip">${t("hydration.guidelineHint")}</p>
+        </div>
+        <div id="custom-target-fields">
+          <label class="field-label" for="target-input">${t("hydration.dailyTarget")}</label>
+          <input class="field" id="target-input" type="number" min="200" max="5000" step="50" />
+        </div>
+        <label class="field-label" for="reminder-mode-input">${t("reminders.mode")}</label>
+        <select class="field" id="reminder-mode-input"><option value="interval">${t("reminders.intervalOption")}</option><option value="fixed">${t("reminders.fixedOption")}</option></select>
+        <label class="field-label" for="reminder-value-input" id="reminder-value-label"></label>
+        <input class="field" id="reminder-value-input" />
+      </section>
+      <section class="panel-section">
+        <div class="section-heading"><div><span class="eyebrow">${t("todo.eyebrow")}</span><h2>${t("todo.title")}</h2></div></div>
+        <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}">+</button></div>
+        <label class="field-label" for="todo-remind-input">${t("todo.remindAt")}</label>
+        <input class="field" id="todo-remind-input" type="datetime-local" />
+        <div class="todo-list" id="todo-list"></div>
+      </section>
     </aside>
   </main>
 `;
@@ -157,53 +232,48 @@ const petSurface = byId<HTMLElement>("pet-surface");
 const settingsPanel = byId<HTMLElement>("settings-panel");
 const speechBubble = byId<HTMLElement>("speech-bubble");
 
-const showMessage = (message: string) => {
+const showMessage = (message: string, duration = 3200) => {
   speechBubble.textContent = message;
-  speechBubble.classList.remove("visible");
-  requestAnimationFrame(() => speechBubble.classList.add("visible"));
+  speechBubble.classList.add("visible");
+  if (messageTimer) window.clearTimeout(messageTimer);
+  messageTimer = window.setTimeout(() => speechBubble.classList.remove("visible"), duration);
 };
 
-const render = () => {
-  const pet = selectedPet();
-  const progress = Math.min(100, (state.waterDone / state.dailyTarget) * 100);
-  byId<HTMLElement>("pet-emoji").textContent = pet.emoji;
-  byId<HTMLElement>("pet-name").textContent = petLabel(pet);
-  byId<HTMLElement>("pet-note").textContent = petNote(pet);
-  byId<HTMLElement>("water-label").textContent = `${state.waterDone} / ${state.dailyTarget} ml`;
-  byId<HTMLElement>("water-remaining").textContent = state.waterDone >= state.dailyTarget ? t("hydration.goalDone") : t("hydration.remaining", { amount: state.dailyTarget - state.waterDone });
-  byId<HTMLElement>("water-progress").style.width = `${progress}%`;
-  byId<HTMLSelectElement>("pet-select").value = state.petId;
-  byId<HTMLInputElement>("scale-input").value = String(state.scale);
-  byId<HTMLElement>("scale-label").textContent = `${Math.round(state.scale * 100)}%`;
-  byId<HTMLInputElement>("always-top-input").checked = state.alwaysOnTop;
-  byId<HTMLInputElement>("autostart-input").checked = state.autostart;
-  byId<HTMLInputElement>("reduce-motion-input").checked = state.reduceMotion;
-  byId<HTMLInputElement>("target-input").value = String(state.dailyTarget);
-  byId<HTMLSelectElement>("reminder-mode-input").value = state.reminderMode;
-  byId<HTMLInputElement>("reminder-value-input").value = state.reminderValue;
-  byId<HTMLElement>("reminder-value-label").textContent = state.reminderMode === "interval" ? t("reminders.intervalLabel") : t("reminders.fixedLabel");
-  byId<HTMLSelectElement>("language-input").value = getLocale();
-  document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
-  document.documentElement.style.setProperty("--pet-accent", pet.accent);
-  renderTodos();
-};
-
-const renderTodos = () => {
-  const list = byId<HTMLElement>("todo-list");
-  list.innerHTML = state.todos.length
-    ? state.todos.map((todo) => `<label class="todo-item ${todo.done ? "done" : ""}"><input type="checkbox" data-todo="${todo.id}" ${todo.done ? "checked" : ""}/><span>${escapeHtml(todo.title)}</span></label>`).join("")
-    : `<div class="empty-state">${t("todo.empty")}</div>`;
-};
-
-const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-
-const applyWindowSettings = async () => {
-  await appWindow.setTitle(t("app.title"));
-  await appWindow.setAlwaysOnTop(state.alwaysOnTop);
-  await appWindow.setSize(new LogicalSize(360 * state.scale, 420 * state.scale));
-  if (state.position) {
-    await appWindow.setPosition(new PhysicalPosition(state.position.x, state.position.y));
+const setPetAction = (action: PetAction, duration = 900) => {
+  currentAction = action;
+  petStage.dataset.action = action;
+  if (actionTimer) window.clearTimeout(actionTimer);
+  if (action !== "idle" && action !== "drag") {
+    actionTimer = window.setTimeout(() => setPetAction("idle", 0), duration);
   }
+};
+
+const collapsedWindowSize = () => new LogicalSize(Math.max(140, state.petSize + 60), Math.max(158, state.petSize + 86));
+
+const clampPosition = async (position: { x: number; y: number }) => {
+  const monitors = await availableMonitors();
+  if (!monitors.length) return position;
+  const windowSize = await appWindow.outerSize();
+  const containing = monitors.find((monitor) => position.x >= monitor.position.x
+    && position.y >= monitor.position.y
+    && position.x < monitor.position.x + monitor.size.width
+    && position.y < monitor.position.y + monitor.size.height);
+  const fallback = await primaryMonitor();
+  const monitor = containing ?? fallback ?? monitors[0];
+  const maxX = monitor.position.x + Math.max(0, monitor.size.width - windowSize.width);
+  const maxY = monitor.position.y + Math.max(0, monitor.size.height - windowSize.height);
+  return {
+    x: Math.max(monitor.position.x, Math.min(maxX, position.x)),
+    y: Math.max(monitor.position.y, Math.min(maxY, position.y)),
+  };
+};
+
+const restorePosition = async () => {
+  if (!state.position) return;
+  const position = await clampPosition(state.position);
+  state.position = position;
+  await appWindow.setPosition(new PhysicalPosition(position.x, position.y));
+  saveState();
 };
 
 const savePosition = async () => {
@@ -212,21 +282,61 @@ const savePosition = async () => {
     state.position = { x: position.x, y: position.y };
     saveState();
   } catch {
-    // Position persistence is best-effort during the initial webview bootstrap.
+    // Window position persistence is best-effort during shutdown.
   }
 };
 
-const recordWater = (amount: number) => {
-  if (state.waterDate !== today()) {
-    state.waterDate = today();
-    state.waterDone = 0;
-  }
-  state.waterDone = Math.min(state.dailyTarget, state.waterDone + amount);
-  saveState();
-  render();
-  showMessage(state.waterDone >= state.dailyTarget ? t("messages.hydrationGoalDone") : t("messages.hydrationRecorded"));
-  petStage.classList.remove("celebrate");
-  requestAnimationFrame(() => petStage.classList.add("celebrate"));
+const setPanelOpen = async (open: boolean) => {
+  panelOpen = open;
+  document.documentElement.dataset.panelOpen = open ? "true" : "false";
+  settingsPanel.setAttribute("aria-hidden", open ? "false" : "true");
+  await appWindow.setSize(open ? new LogicalSize(390, 650) : collapsedWindowSize());
+  if (state.position) await restorePosition();
+};
+
+const renderTodos = () => {
+  const list = byId<HTMLElement>("todo-list");
+  list.innerHTML = state.todos.length
+    ? state.todos.map((todo) => {
+      const time = todo.remindAt ? new Date(todo.remindAt).toLocaleString(getLocale(), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : t("todo.noReminder");
+      return `<div class="todo-item ${todo.done ? "done" : ""}"><label><input type="checkbox" data-todo-toggle="${todo.id}" ${todo.done ? "checked" : ""}/><span>${escapeHtml(todo.title)}</span></label><div><time>${escapeHtml(time)}</time><button data-todo-delete="${todo.id}" aria-label="${t("todo.delete")}">×</button></div></div>`;
+    }).join("")
+    : `<div class="empty-state">${t("todo.empty")}</div>`;
+};
+
+const render = () => {
+  const pet = selectedPet();
+  const target = targetAmount();
+  const progress = Math.min(100, target > 0 ? (state.waterDone / target) * 100 : 0);
+  byId<HTMLImageElement>("pet-image").src = pet.portrait;
+  byId<HTMLImageElement>("pet-image").alt = t(pet.nameKey);
+  byId<HTMLSelectElement>("pet-select").value = state.petId;
+  byId<HTMLInputElement>("size-input").value = String(state.petSize);
+  byId<HTMLElement>("size-label").textContent = `${state.petSize}px`;
+  byId<HTMLInputElement>("always-top-input").checked = state.alwaysOnTop;
+  byId<HTMLInputElement>("autostart-input").checked = state.autostart;
+  byId<HTMLInputElement>("reduce-motion-input").checked = state.reduceMotion;
+  byId<HTMLSelectElement>("target-mode-input").value = state.targetMode;
+  byId<HTMLSelectElement>("guideline-profile-input").value = state.guidelineProfile;
+  byId<HTMLInputElement>("target-input").value = String(state.customTarget);
+  byId<HTMLElement>("guideline-fields").hidden = state.targetMode !== "guideline";
+  byId<HTMLElement>("custom-target-fields").hidden = state.targetMode !== "custom";
+  byId<HTMLSelectElement>("reminder-mode-input").value = state.reminderMode;
+  const reminderInput = byId<HTMLInputElement>("reminder-value-input");
+  reminderInput.type = state.reminderMode === "interval" ? "number" : "time";
+  reminderInput.min = state.reminderMode === "interval" ? "15" : "";
+  reminderInput.max = state.reminderMode === "interval" ? "360" : "";
+  reminderInput.step = state.reminderMode === "interval" ? "15" : "60";
+  reminderInput.value = state.reminderValue;
+  byId<HTMLElement>("reminder-value-label").textContent = state.reminderMode === "interval" ? t("reminders.intervalLabel") : t("reminders.fixedLabel");
+  byId<HTMLSelectElement>("language-input").value = getLocale();
+  byId<HTMLElement>("water-label").textContent = `${state.waterDone} / ${target} ml`;
+  byId<HTMLElement>("water-progress").style.width = `${progress}%`;
+  byId<HTMLElement>("water-remaining").textContent = state.waterDone >= target ? t("hydration.goalDone") : t("hydration.remaining", { amount: target - state.waterDone });
+  document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
+  document.documentElement.style.setProperty("--pet-size", `${state.petSize}px`);
+  document.documentElement.style.setProperty("--pet-accent", pet.accent);
+  renderTodos();
 };
 
 const notify = async (title: string, body: string) => {
@@ -239,24 +349,57 @@ const notify = async (title: string, body: string) => {
   }
 };
 
-const reminderStamp = () => `${today()}-${new Date().getHours()}:${new Date().getMinutes()}`;
+const resetWaterForNewDay = () => {
+  if (state.waterDate === localDateKey()) return;
+  state.waterDate = localDateKey();
+  state.waterDone = 0;
+  state.lastHydrationReminderKey = "";
+  state.lastHydrationReminderAt = Date.now();
+  saveState();
+};
 
-const checkReminder = () => {
+const recordWater = (amount: number) => {
+  resetWaterForNewDay();
+  const target = targetAmount();
+  const wasComplete = state.waterDone >= target;
+  state.waterDone = Math.min(target, state.waterDone + amount);
+  saveState();
+  render();
+  setPetAction(state.waterDone >= target && !wasComplete ? "happy" : "drink", 1200);
+  showMessage(state.waterDone >= target ? t("messages.hydrationGoalDone") : t("messages.hydrationRecorded"));
+};
+
+const checkReminders = () => {
+  resetWaterForNewDay();
   const now = new Date();
-  const stamp = reminderStamp();
-  let due = false;
-  if (state.reminderMode === "fixed") {
-    const [hours, minutes] = state.reminderValue.split(":").map(Number);
-    due = hours === now.getHours() && minutes === now.getMinutes();
-  } else {
-    const interval = Number(state.reminderValue);
-    due = Number.isFinite(interval) && interval > 0 && now.getMinutes() % interval === 0;
+  const target = targetAmount();
+  let hydrationDue = false;
+  if (state.waterDone < target && state.reminderMode === "interval") {
+    const intervalMinutes = Math.max(15, Number(state.reminderValue) || 60);
+    hydrationDue = Date.now() - state.lastHydrationReminderAt >= intervalMinutes * 60_000;
+  } else if (state.waterDone < target) {
+    const minuteKey = `${localDateKey(now)}-${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    hydrationDue = state.reminderValue === minuteKey.slice(-5) && state.lastHydrationReminderKey !== minuteKey;
+    if (hydrationDue) state.lastHydrationReminderKey = minuteKey;
   }
-  if (due && lastReminderStamp !== stamp && state.waterDone < state.dailyTarget) {
-    lastReminderStamp = stamp;
-    showMessage(t("messages.reminder"));
-    void notify(t("actions.drink"), t("messages.notificationBody", { done: state.waterDone, target: state.dailyTarget }));
+  if (hydrationDue) {
+    state.lastHydrationReminderAt = Date.now();
+    setPetAction("remind", 1800);
+    showMessage(t("messages.reminder"), 5000);
+    void notify(t("actions.drink"), t("messages.notificationBody", { done: state.waterDone, target }));
   }
+
+  let todoChanged = false;
+  for (const todo of state.todos) {
+    if (!todo.done && !todo.notified && todo.remindAt && new Date(todo.remindAt).getTime() <= Date.now()) {
+      todo.notified = true;
+      todoChanged = true;
+      setPetAction("remind", 1800);
+      showMessage(t("messages.todoReminder", { todo: todo.title }), 5000);
+      void notify(t("todo.notificationTitle"), todo.title);
+    }
+  }
+  if (hydrationDue || todoChanged) saveState();
 };
 
 const updateAutostart = async (enabled: boolean) => {
@@ -274,38 +417,62 @@ const updateAutostart = async (enabled: boolean) => {
 
 const addTodo = () => {
   const input = byId<HTMLInputElement>("todo-input");
+  const remindInput = byId<HTMLInputElement>("todo-remind-input");
   const title = input.value.trim();
   if (!title) return;
-  state.todos.unshift({ id: crypto.randomUUID(), title, done: false });
+  state.todos.unshift({ id: crypto.randomUUID(), title, remindAt: remindInput.value, done: false, notified: false });
   input.value = "";
+  remindInput.value = toLocalDateTimeInput(new Date(Date.now() + 60 * 60_000));
   saveState();
   renderTodos();
   showMessage(t("messages.todoAdded"));
 };
 
-byId<HTMLSelectElement>("pet-select").innerHTML = pets.map((pet) => `<option value="${pet.id}">${pet.emoji} ${petLabel(pet)}</option>`).join("");
-byId("settings-button").addEventListener("click", () => settingsPanel.classList.remove("hidden"));
-byId("close-settings").addEventListener("click", () => settingsPanel.classList.add("hidden"));
+byId<HTMLSelectElement>("pet-select").innerHTML = pets.map((pet) => `<option value="${pet.id}">${t(pet.nameKey)}</option>`).join("");
+byId<HTMLInputElement>("todo-remind-input").value = toLocalDateTimeInput(new Date(Date.now() + 60 * 60_000));
+
+byId("settings-button").addEventListener("click", () => void setPanelOpen(true));
+byId("close-settings").addEventListener("click", () => void setPanelOpen(false));
 byId("drink-button").addEventListener("click", () => recordWater(250));
-byId("feed-button").addEventListener("click", () => showMessage(t("messages.feed")));
-byId("todo-button").addEventListener("click", () => settingsPanel.classList.remove("hidden"));
-petSurface.addEventListener("click", () => showMessage(t("messages.petInteraction")));
-petSurface.addEventListener("pointerdown", async (event) => {
-  if (event.button === 0) await appWindow.startDragging();
+byId("panel-drink-button").addEventListener("click", () => recordWater(250));
+byId("feed-button").addEventListener("click", () => {
+  setPetAction("feed", 1200);
+  showMessage(t("messages.feed"));
 });
-window.addEventListener("pointerup", () => void savePosition());
+byId("todo-button").addEventListener("click", () => void setPanelOpen(true));
+petSurface.addEventListener("click", () => {
+  if (currentAction === "drag") return;
+  setPetAction("touch", 900);
+  showMessage(t("messages.petInteraction"));
+});
+petSurface.addEventListener("pointerdown", async (event) => {
+  if (event.button !== 0 || panelOpen) return;
+  setPetAction("drag", 0);
+  try {
+    await appWindow.startDragging();
+    await savePosition();
+  } finally {
+    setPetAction("idle", 0);
+  }
+});
+petSurface.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    setPetAction("touch", 900);
+    showMessage(t("messages.petInteraction"));
+  }
+});
 
 byId<HTMLSelectElement>("pet-select").addEventListener("change", (event) => {
   state.petId = (event.target as HTMLSelectElement).value;
   saveState();
   render();
-  showMessage(t("messages.petChanged", { pet: petLabel(selectedPet()) }));
+  setPetAction("happy", 1000);
+  showMessage(t("messages.petChanged", { pet: t(selectedPet().nameKey) }));
 });
-byId<HTMLInputElement>("scale-input").addEventListener("input", async (event) => {
-  state.scale = Number((event.target as HTMLInputElement).value);
+byId<HTMLInputElement>("size-input").addEventListener("input", (event) => {
+  state.petSize = Number((event.target as HTMLInputElement).value);
   saveState();
   render();
-  await appWindow.setSize(new LogicalSize(360 * state.scale, 420 * state.scale));
 });
 byId<HTMLInputElement>("always-top-input").addEventListener("change", async (event) => {
   state.alwaysOnTop = (event.target as HTMLInputElement).checked;
@@ -322,20 +489,34 @@ byId<HTMLSelectElement>("language-input").addEventListener("change", (event) => 
   setLocale((event.target as HTMLSelectElement).value as Locale);
   window.location.reload();
 });
+byId<HTMLSelectElement>("target-mode-input").addEventListener("change", (event) => {
+  state.targetMode = (event.target as HTMLSelectElement).value as TargetMode;
+  state.waterDone = Math.min(state.waterDone, targetAmount());
+  saveState();
+  render();
+});
+byId<HTMLSelectElement>("guideline-profile-input").addEventListener("change", (event) => {
+  state.guidelineProfile = (event.target as HTMLSelectElement).value as GuidelineProfile;
+  state.waterDone = Math.min(state.waterDone, targetAmount());
+  saveState();
+  render();
+});
 byId<HTMLInputElement>("target-input").addEventListener("change", (event) => {
-  state.dailyTarget = Math.max(200, Math.min(5000, Number((event.target as HTMLInputElement).value) || 1600));
-  state.waterDone = Math.min(state.waterDone, state.dailyTarget);
+  state.customTarget = Math.max(200, Math.min(5000, Number((event.target as HTMLInputElement).value) || 1600));
+  state.waterDone = Math.min(state.waterDone, targetAmount());
   saveState();
   render();
 });
 byId<HTMLSelectElement>("reminder-mode-input").addEventListener("change", (event) => {
   state.reminderMode = (event.target as HTMLSelectElement).value as ReminderMode;
   state.reminderValue = state.reminderMode === "interval" ? "60" : "10:00";
+  state.lastHydrationReminderAt = Date.now();
   saveState();
   render();
 });
 byId<HTMLInputElement>("reminder-value-input").addEventListener("change", (event) => {
-  state.reminderValue = (event.target as HTMLInputElement).value.trim();
+  state.reminderValue = (event.target as HTMLInputElement).value;
+  state.lastHydrationReminderAt = Date.now();
   saveState();
 });
 byId("add-todo").addEventListener("click", addTodo);
@@ -344,17 +525,47 @@ byId<HTMLInputElement>("todo-input").addEventListener("keydown", (event) => {
 });
 byId("todo-list").addEventListener("change", (event) => {
   const target = event.target as HTMLInputElement;
-  const id = target.dataset.todo;
+  const id = target.dataset.todoToggle;
   const todo = state.todos.find((item) => item.id === id);
-  if (todo) todo.done = target.checked;
+  if (!todo) return;
+  todo.done = target.checked;
+  saveState();
+  renderTodos();
+  if (todo.done) {
+    setPetAction("happy", 1200);
+    showMessage(t("messages.todoDone"));
+  }
+});
+byId("todo-list").addEventListener("click", (event) => {
+  const target = event.target as HTMLButtonElement;
+  const id = target.dataset.todoDelete;
+  if (!id) return;
+  state.todos = state.todos.filter((todo) => todo.id !== id);
   saveState();
   renderTodos();
 });
 
-render();
-void applyWindowSettings();
-reminderTimer = window.setInterval(checkReminder, 30_000);
+const bootstrap = async () => {
+  render();
+  await appWindow.setTitle(t("app.title"));
+  await appWindow.setAlwaysOnTop(state.alwaysOnTop);
+  await appWindow.setSize(collapsedWindowSize());
+  await restorePosition();
+  try {
+    state.autostart = await isAutostartEnabled();
+    saveState();
+    render();
+  } catch {
+    // The plugin can be unavailable in a browser-only preview.
+  }
+  checkReminders();
+  reminderTimer = window.setInterval(checkReminders, 15_000);
+};
+
+void bootstrap();
 window.addEventListener("beforeunload", () => {
   if (reminderTimer) window.clearInterval(reminderTimer);
+  if (actionTimer) window.clearTimeout(actionTimer);
+  if (messageTimer) window.clearTimeout(messageTimer);
   void savePosition();
 });

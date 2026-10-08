@@ -7,6 +7,7 @@ const zhCN = {
   },
   accessibility: {
     openSettings: "打开设置",
+    closeSettings: "关闭设置",
     interactWithPet: "和桌宠互动",
   },
   actions: {
@@ -15,13 +16,22 @@ const zhCN = {
     todo: "Todo",
   },
   hydration: {
+    eyebrow: "饮水助手",
     title: "今日饮水",
     targetHint: "目标可在设置中调整",
     goalDone: "今日目标完成",
     remaining: "还差 {{amount}} ml",
     dailyTarget: "每日饮水目标（ml）",
+    targetMode: "目标计算方式",
+    guidelineMode: "健康指南估算",
+    customMode: "自定义目标",
+    guidelineProfile: "成人参考档位",
+    adultFemale: "成年女性 · 1500ml",
+    adultMale: "成年男性 · 1700ml",
+    guidelineHint: "参考《中国居民膳食指南（2022）》温和气候、低活动量建议；特殊健康状况请遵医嘱调整。",
   },
   settings: {
+    companionLabel: "桌面伙伴",
     title: "设置",
     petAppearance: "桌宠形象",
     petSize: "桌宠尺寸",
@@ -40,10 +50,15 @@ const zhCN = {
     fixedLabel: "固定时间（HH:MM）",
   },
   todo: {
+    eyebrow: "轻量待办",
     title: "今日待办",
     placeholder: "写下一件小事",
     add: "添加待办",
     empty: "今天还没有 Todo",
+    remindAt: "提醒时间（可不填）",
+    noReminder: "无提醒",
+    delete: "删除待办",
+    notificationTitle: "Todo 提醒",
   },
   locale: {
     zhCN: "简体中文",
@@ -64,6 +79,8 @@ const zhCN = {
     notificationBody: "今天已完成 {{done}} / {{target}} ml",
     autostartUnavailable: "开机自启需要安装后的应用环境，当前先保留设置。",
     todoAdded: "已记下这件小事。",
+    todoDone: "完成啦，做得很好！",
+    todoReminder: "该处理“{{todo}}”啦。",
     petInteraction: "摸摸我！今天也一起专注一下。",
     feed: "谢谢投喂！我会乖乖陪着你。",
     petChanged: "换成{{pet}}啦。",
@@ -71,4 +88,3 @@ const zhCN = {
 } as const;
 
 export default zhCN;
-

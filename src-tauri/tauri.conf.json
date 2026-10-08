@@ -14,14 +14,15 @@
       {
         "label": "main",
         "title": "Desktop Pet",
-        "width": 360,
-        "height": 420,
-        "minWidth": 280,
-        "minHeight": 320,
+        "width": 140,
+        "height": 158,
+        "minWidth": 120,
+        "minHeight": 140,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
+        "backgroundThrottling": "disabled",
         "skipTaskbar": true,
         "visible": true
       }
