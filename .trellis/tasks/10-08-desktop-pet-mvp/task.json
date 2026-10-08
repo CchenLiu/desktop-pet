@@ -1,0 +1,29 @@
+{
+  "id": "desktop-pet-mvp",
+  "name": "desktop-pet-mvp",
+  "title": "桌宠 MVP 完整实现",
+  "description": "完成 Windows Tauri 2 轻量桌宠：阿拉斯加、德国牧羊犬、暹罗猫、缅因猫四种形象；支持拖动、记住位置、多屏、系统托盘、开机自启、尺寸调节；按健康日饮水目标与间隔/固定时间两种方式提醒；Todo 标题与到期提醒；喝水、喂食、触摸、拖动等动画反馈；预留外部皮肤接口；所有文案走多语言。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "src/**,src-tauri/**,assets/**,docs/**,.github/**,README.md",
+  "package": null,
+  "priority": "P0",
+  "creator": "baichenliu1",
+  "assignee": "baichenliu1",
+  "createdAt": "2026-10-08",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "build_strategy": "github-actions",
+    "local_rust": "disabled"
+  }
+}
