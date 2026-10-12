@@ -69,3 +69,16 @@ test("expanded settings panel keeps the redesigned hierarchy", () => {
   assert.match(styles, /\.panel-scroll/);
   assert.match(styles, /\.hydration-card/);
 });
+
+test("Alaskan pet uses frame-based sprite animations with static fallback", () => {
+  const main = read("src/main.ts");
+  const player = read("src/sprite-player.ts");
+
+  assert.match(main, /canvas class="pet-sprite"/);
+  assert.match(main, /idle: \{ src: animation\("alaskan", "idle"\), frames: 8/);
+  assert.match(main, /touch: \{ src: animation\("alaskan", "touch"\), frames: 8/);
+  assert.match(main, /drink: \{ src: animation\("alaskan", "drink"\), frames: 8/);
+  assert.match(main, /feed: \{ src: animation\("alaskan", "feed"\), frames: 8/);
+  assert.match(player, /requestAnimationFrame/);
+  assert.match(player, /context\.drawImage/);
+});

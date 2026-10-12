@@ -21,6 +21,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import type { PetAction, PetSkinManifest } from "./pet-skin";
+import { SpritePlayer } from "./sprite-player";
 
 type ReminderMode = "interval" | "fixed";
 type TargetMode = "guideline" | "custom";
@@ -64,18 +65,26 @@ type AppState = {
 };
 
 const portrait = (id: string) => new URL(`./assets/pets/${id}/portrait.png`, import.meta.url).href;
-const skin = (id: string): PetSkinManifest => ({
+const animation = (id: string, action: string) => new URL(`./assets/pets/${id}/animations/${action}.png`, import.meta.url).href;
+const skin = (id: string, animations: PetSkinManifest["animations"] = {}): PetSkinManifest => ({
   schemaVersion: 1,
   id: `${id}-default`,
   name: id,
   canvas: { width: 512, height: 512 },
   anchor: { x: 0.5, y: 0.96 },
   preview: portrait(id),
-  animations: {},
+  animations,
+});
+
+const alaskanSkin = skin("alaskan", {
+  idle: { src: animation("alaskan", "idle"), frames: 8, fps: 3, loop: true },
+  touch: { src: animation("alaskan", "touch"), frames: 8, fps: 9, loop: false },
+  drink: { src: animation("alaskan", "drink"), frames: 8, fps: 7, loop: false },
+  feed: { src: animation("alaskan", "feed"), frames: 8, fps: 8, loop: false },
 });
 
 const pets: Pet[] = [
-  { id: "alaskan", nameKey: "pets.alaskan.name", noteKey: "pets.alaskan.note", accent: "#8a756a", portrait: portrait("alaskan"), skin: skin("alaskan") },
+  { id: "alaskan", nameKey: "pets.alaskan.name", noteKey: "pets.alaskan.note", accent: "#8a756a", portrait: portrait("alaskan"), skin: alaskanSkin },
   { id: "shepherd", nameKey: "pets.shepherd.name", noteKey: "pets.shepherd.note", accent: "#a76b32", portrait: portrait("shepherd"), skin: skin("shepherd") },
   { id: "siamese", nameKey: "pets.siamese.name", noteKey: "pets.siamese.note", accent: "#6e8fb8", portrait: portrait("siamese"), skin: skin("siamese") },
   { id: "maine-coon", nameKey: "pets.maineCoon.name", noteKey: "pets.maineCoon.note", accent: "#8c6d4f", portrait: portrait("maine-coon"), skin: skin("maine-coon") },
@@ -176,6 +185,7 @@ document.body.innerHTML = `
         <div class="pet-shadow"></div>
         <div class="pet-aura"></div>
         <img class="pet-image" id="pet-image" alt="" draggable="false" />
+        <canvas class="pet-sprite" id="pet-sprite" aria-hidden="true" hidden></canvas>
         <span class="action-prop" id="action-prop" aria-hidden="true"></span>
       </div>
       <div class="quick-actions" id="quick-actions" aria-label="${t("accessibility.quickActions")}">
@@ -239,6 +249,9 @@ const petStage = byId<HTMLElement>("pet-stage");
 const petSurface = byId<HTMLElement>("pet-surface");
 const settingsPanel = byId<HTMLElement>("settings-panel");
 const speechBubble = byId<HTMLElement>("speech-bubble");
+const petImage = byId<HTMLImageElement>("pet-image");
+const petSprite = byId<HTMLCanvasElement>("pet-sprite");
+const spritePlayer = new SpritePlayer(petSprite);
 const showMessage = (message: string, duration = 3200) => {
   speechBubble.textContent = message;
   speechBubble.classList.add("visible");
@@ -249,9 +262,22 @@ const showMessage = (message: string, duration = 3200) => {
 const setPetAction = (action: PetAction, duration = 900) => {
   currentAction = action;
   petStage.dataset.action = action;
+  const asset = selectedPet().skin.animations[action] ?? selectedPet().skin.animations.idle;
+  if (asset) {
+    petImage.hidden = true;
+    petSprite.hidden = false;
+    petStage.dataset.sprite = "true";
+    void spritePlayer.play(asset, { reduceMotion: state.reduceMotion, size: state.petSize });
+  } else {
+    spritePlayer.stop();
+    petImage.hidden = false;
+    petSprite.hidden = true;
+    petStage.dataset.sprite = "false";
+  }
   if (actionTimer) window.clearTimeout(actionTimer);
   if (action !== "idle" && action !== "drag") {
-    actionTimer = window.setTimeout(() => setPetAction("idle", 0), duration);
+    const assetDuration = asset && !asset.loop ? (asset.frames / asset.fps) * 1000 : duration;
+    actionTimer = window.setTimeout(() => setPetAction("idle", 0), assetDuration);
   }
 };
 
@@ -315,8 +341,8 @@ const render = () => {
   const pet = selectedPet();
   const target = targetAmount();
   const progress = Math.min(100, target > 0 ? (state.waterDone / target) * 100 : 0);
-  byId<HTMLImageElement>("pet-image").src = pet.portrait;
-  byId<HTMLImageElement>("pet-image").alt = t(pet.nameKey);
+  petImage.src = pet.portrait;
+  petImage.alt = t(pet.nameKey);
   byId<HTMLImageElement>("panel-pet-image").src = pet.portrait;
   byId<HTMLImageElement>("panel-pet-image").alt = t(pet.nameKey);
   byId<HTMLElement>("panel-pet-note").textContent = t(pet.noteKey);
@@ -346,6 +372,7 @@ const render = () => {
   document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
   document.documentElement.style.setProperty("--pet-size", `${state.petSize}px`);
   document.documentElement.style.setProperty("--pet-accent", pet.accent);
+  setPetAction(currentAction === "drag" ? "idle" : currentAction, 0);
   renderTodos();
 };
 
