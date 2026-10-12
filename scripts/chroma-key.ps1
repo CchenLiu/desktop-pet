@@ -5,7 +5,11 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Destination,
 
-  [switch]$NormalizeFrameSize
+  [switch]$NormalizeFrameSize,
+
+  [switch]$StrictGrid,
+
+  [int]$SeparatorSearchRadius = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,48 +62,62 @@ for ($y = 0; $y -lt $bitmap.Height; $y++) {
   }
 }
 
-$searchRadius = 56
-$rowSeparators = @()
-for ($separatorIndex = 1; $separatorIndex -lt 4; $separatorIndex++) {
-  $ideal = [int][Math]::Round(($bitmap.Height * $separatorIndex) / 4.0)
-  $bestPosition = $ideal
-  $bestCount = [int]::MaxValue
-  for ($candidate = $ideal - $searchRadius; $candidate -le $ideal + $searchRadius; $candidate++) {
-    $count = 0
-    $rowOffset = $candidate * $data.Stride
-    for ($x = 0; $x -lt $bitmap.Width; $x++) {
-      if ($pixels[$rowOffset + ($x * 4) + 3] -gt 8) { $count++ }
-    }
-    if ($count -lt $bestCount -or ($count -eq $bestCount -and [Math]::Abs($candidate - $ideal) -lt [Math]::Abs($bestPosition - $ideal))) {
-      $bestCount = $count
-      $bestPosition = $candidate
+$rowBounds = @()
+$columnBoundsByRow = @()
+if ($StrictGrid) {
+  $rowBounds = 0..4 | ForEach-Object { [int](($bitmap.Height / 4) * $_) }
+  for ($rowIndex = 0; $rowIndex -lt 4; $rowIndex++) {
+    $columnBoundsByRow += [PSCustomObject]@{
+      Values = @(0..4 | ForEach-Object { [int](($bitmap.Width / 4) * $_) })
     }
   }
-  $rowSeparators += $bestPosition
-}
-
-$rowBounds = @(0) + $rowSeparators + @($bitmap.Height)
-$columnBoundsByRow = @()
-for ($rowIndex = 0; $rowIndex -lt 4; $rowIndex++) {
-  $columnSeparators = @()
+} else {
+  $searchRadius = if ($SeparatorSearchRadius -gt 0) {
+    $SeparatorSearchRadius
+  } else {
+    [Math]::Min(56, [Math]::Max(12, [int]([Math]::Min($bitmap.Width, $bitmap.Height) / 24)))
+  }
+  $rowSeparators = @()
   for ($separatorIndex = 1; $separatorIndex -lt 4; $separatorIndex++) {
-    $ideal = [int][Math]::Round(($bitmap.Width * $separatorIndex) / 4.0)
+    $ideal = [int][Math]::Round(($bitmap.Height * $separatorIndex) / 4.0)
     $bestPosition = $ideal
     $bestCount = [int]::MaxValue
     for ($candidate = $ideal - $searchRadius; $candidate -le $ideal + $searchRadius; $candidate++) {
       $count = 0
-      for ($y = $rowBounds[$rowIndex]; $y -lt $rowBounds[$rowIndex + 1]; $y++) {
-        if ($pixels[($y * $data.Stride) + ($candidate * 4) + 3] -gt 8) { $count++ }
+      $rowOffset = $candidate * $data.Stride
+      for ($x = 0; $x -lt $bitmap.Width; $x++) {
+        if ($pixels[$rowOffset + ($x * 4) + 3] -gt 8) { $count++ }
       }
       if ($count -lt $bestCount -or ($count -eq $bestCount -and [Math]::Abs($candidate - $ideal) -lt [Math]::Abs($bestPosition - $ideal))) {
         $bestCount = $count
         $bestPosition = $candidate
       }
     }
-    $columnSeparators += $bestPosition
+    $rowSeparators += $bestPosition
   }
-  $columnBoundsByRow += [PSCustomObject]@{
-    Values = @(0) + $columnSeparators + @($bitmap.Width)
+
+  $rowBounds = @(0) + $rowSeparators + @($bitmap.Height)
+  for ($rowIndex = 0; $rowIndex -lt 4; $rowIndex++) {
+    $columnSeparators = @()
+    for ($separatorIndex = 1; $separatorIndex -lt 4; $separatorIndex++) {
+      $ideal = [int][Math]::Round(($bitmap.Width * $separatorIndex) / 4.0)
+      $bestPosition = $ideal
+      $bestCount = [int]::MaxValue
+      for ($candidate = $ideal - $searchRadius; $candidate -le $ideal + $searchRadius; $candidate++) {
+        $count = 0
+        for ($y = $rowBounds[$rowIndex]; $y -lt $rowBounds[$rowIndex + 1]; $y++) {
+          if ($pixels[($y * $data.Stride) + ($candidate * 4) + 3] -gt 8) { $count++ }
+        }
+        if ($count -lt $bestCount -or ($count -eq $bestCount -and [Math]::Abs($candidate - $ideal) -lt [Math]::Abs($bestPosition - $ideal))) {
+          $bestCount = $count
+          $bestPosition = $candidate
+        }
+      }
+      $columnSeparators += $bestPosition
+    }
+    $columnBoundsByRow += [PSCustomObject]@{
+      Values = @(0) + $columnSeparators + @($bitmap.Width)
+    }
   }
 }
 
