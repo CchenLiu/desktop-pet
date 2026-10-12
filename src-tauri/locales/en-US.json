@@ -2,6 +2,7 @@
   "tooltip": "Desktop Pet",
   "show": "Show pet",
   "hide": "Hide pet",
+  "settings": "Open settings",
   "quit": "Quit"
 }
 

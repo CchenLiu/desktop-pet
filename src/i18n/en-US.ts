@@ -9,11 +9,16 @@ const enUS = {
     openSettings: "Open settings",
     closeSettings: "Close settings",
     interactWithPet: "Interact with desktop pet",
+    quitApp: "Quit desktop pet",
+    quickActions: "Quick interactions",
+    petContextMenu: "Desktop pet menu",
   },
   actions: {
     drink: "Drink +250ml",
     feed: "Feed",
     todo: "Todo",
+    settings: "Open settings",
+    quit: "Quit",
   },
   hydration: {
     eyebrow: "Hydration",
@@ -33,6 +38,9 @@ const enUS = {
   settings: {
     companionLabel: "Desktop companion",
     title: "Settings",
+    subtitle: "Shape the companion, reminders, and desktop habits around you.",
+    appearanceTitle: "Appearance and behavior",
+    appearanceHint: "Hover for quick actions. Hold the pet to drag it.",
     petAppearance: "Pet appearance",
     petSize: "Pet size",
     alwaysOnTop: "Always on top",
@@ -41,6 +49,7 @@ const enUS = {
     reduceMotion: "Reduce motion",
     language: "Interface language",
     reminderTip: "Reminders continue while the pet is hidden and stop when the app exits.",
+    contextHint: "Right-click the pet or tray icon to quit",
   },
   reminders: {
     mode: "Reminder mode",
@@ -72,8 +81,8 @@ const enUS = {
   },
   messages: {
     defaultBubble: "Remember to drink some water today.",
-    hydrationGoalDone: "Today's hydration target is complete!",
-    hydrationRecorded: "Nice, hydration recorded. Keep going.",
+    hydrationGoalDone: "+{{amount}} ml this time\nToday {{done}} / {{target}} ml\nDaily hydration goal complete",
+    hydrationRecorded: "+{{amount}} ml this time\nToday {{done}} / {{target}} ml\n{{remaining}} ml remaining",
     notificationUnavailable: "System notifications are unavailable; I will keep reminding you here.",
     reminder: "Time for some water. Tap the drink button when done.",
     notificationBody: "Completed {{done}} / {{target}} ml today",

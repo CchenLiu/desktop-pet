@@ -5,6 +5,7 @@ pub struct TrayLocale {
     pub tooltip: String,
     pub show: String,
     pub hide: String,
+    pub settings: String,
     pub quit: String,
 }
 

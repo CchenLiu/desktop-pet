@@ -9,11 +9,16 @@ const zhCN = {
     openSettings: "打开设置",
     closeSettings: "关闭设置",
     interactWithPet: "和桌宠互动",
+    quitApp: "退出桌宠",
+    quickActions: "快捷互动",
+    petContextMenu: "桌宠菜单",
   },
   actions: {
     drink: "喝水 +250ml",
     feed: "喂食",
     todo: "Todo",
+    settings: "打开设置",
+    quit: "退出",
   },
   hydration: {
     eyebrow: "饮水助手",
@@ -33,6 +38,9 @@ const zhCN = {
   settings: {
     companionLabel: "桌面伙伴",
     title: "设置",
+    subtitle: "把陪伴、提醒和桌面习惯调成你喜欢的样子。",
+    appearanceTitle: "外观与行为",
+    appearanceHint: "悬停显示快捷操作，按住桌宠即可拖动。",
     petAppearance: "桌宠形象",
     petSize: "桌宠尺寸",
     alwaysOnTop: "始终置顶",
@@ -41,6 +49,7 @@ const zhCN = {
     reduceMotion: "减少动画",
     language: "界面语言",
     reminderTip: "提醒会在桌宠隐藏时继续运行；退出应用后停止。",
+    contextHint: "右键桌宠或托盘图标可退出",
   },
   reminders: {
     mode: "提醒方式",
@@ -72,8 +81,8 @@ const zhCN = {
   },
   messages: {
     defaultBubble: "今天也要记得喝水呀。",
-    hydrationGoalDone: "今天的饮水目标完成啦！",
-    hydrationRecorded: "很好，喝水完成，继续保持。",
+    hydrationGoalDone: "本次 +{{amount}} ml\n今日累计 {{done}} / {{target}} ml\n已完成今日饮水目标",
+    hydrationRecorded: "本次 +{{amount}} ml\n今日累计 {{done}} / {{target}} ml\n还需 {{remaining}} ml",
     notificationUnavailable: "系统通知暂不可用，我会继续在桌宠里提醒你。",
     reminder: "该喝水啦，完成后点一下喝水按钮。",
     notificationBody: "今天已完成 {{done}} / {{target}} ml",

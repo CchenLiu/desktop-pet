@@ -3,4 +3,6 @@ dist/
 .tauri/
 src-tauri/target/
 .cargo-mirror/
+.tmp/
+src-tauri/gen/
 *.log

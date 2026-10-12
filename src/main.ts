@@ -17,6 +17,8 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import type { PetAction, PetSkinManifest } from "./pet-skin";
 
@@ -167,62 +169,68 @@ document.body.innerHTML = `
   <main class="app-shell" id="app-shell">
     <section class="pet-stage" id="pet-stage" data-action="idle">
       <div class="speech-bubble" id="speech-bubble" role="status">${t("messages.defaultBubble")}</div>
-      <button class="settings-trigger" id="settings-button" aria-label="${t("accessibility.openSettings")}">⚙</button>
+      <button class="settings-trigger" id="settings-button" aria-label="${t("accessibility.openSettings")}" data-tooltip="${t("actions.settings")}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75a2 2 0 0 1 1.93 1.48l.18.67a6.9 6.9 0 0 1 1.26.73l.67-.18a2 2 0 0 1 2.22.94l.5.87a2 2 0 0 1-.3 2.39l-.5.49c.03.29.05.58.05.87 0 .3-.02.59-.05.87l.5.5a2 2 0 0 1 .3 2.38l-.5.87a2 2 0 0 1-2.22.94l-.67-.18c-.4.28-.82.52-1.26.73l-.18.67A2 2 0 0 1 12 20.25h-1a2 2 0 0 1-1.93-1.48l-.18-.67a6.9 6.9 0 0 1-1.26-.73l-.67.18a2 2 0 0 1-2.22-.94l-.5-.87a2 2 0 0 1 .3-2.39l.5-.49A7.7 7.7 0 0 1 5 12c0-.3.02-.59.05-.87l-.5-.5a2 2 0 0 1-.3-2.38l.5-.87a2 2 0 0 1 2.22-.94l.67.18c.4-.28.82-.52 1.26-.73l.18-.67A2 2 0 0 1 11 3.75h1Z"/><circle cx="11.5" cy="12" r="2.4"/></svg>
+      </button>
       <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="${t("accessibility.interactWithPet")}">
         <div class="pet-shadow"></div>
         <div class="pet-aura"></div>
         <img class="pet-image" id="pet-image" alt="" draggable="false" />
         <span class="action-prop" id="action-prop" aria-hidden="true"></span>
       </div>
-      <div class="quick-actions" id="quick-actions">
-        <button class="quick-button" id="drink-button" aria-label="${t("actions.drink")}">💧</button>
-        <button class="quick-button" id="feed-button" aria-label="${t("actions.feed")}">🍪</button>
-        <button class="quick-button" id="todo-button" aria-label="${t("actions.todo")}">✓</button>
+      <div class="quick-actions" id="quick-actions" aria-label="${t("accessibility.quickActions")}">
+        <button class="quick-button" id="drink-button" aria-label="${t("actions.drink")}" data-tooltip="${t("actions.drink")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4s5 5.7 5 10a5 5 0 1 1-10 0c0-4.3 5-10 5-10Z"/><path d="M9.5 14.1c.25 1.3 1.08 2.05 2.5 2.25"/></svg></button>
+        <button class="quick-button" id="feed-button" aria-label="${t("actions.feed")}" data-tooltip="${t("actions.feed")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.1 5.5a3 3 0 0 0-4.2 4.2l.7.7-.7.7a3 3 0 0 0 4.2 4.2l.8-.7 5.4 5.4a3 3 0 0 0 4.2-4.2l-.7-.7.7-.8a3 3 0 0 0-4.2-4.2l-5.4-5.4-.8.8Z"/></svg></button>
+        <button class="quick-button" id="todo-button" aria-label="${t("actions.todo")}" data-tooltip="${t("actions.todo")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5h9M8.5 12h9M8.5 17.5h9"/><path d="m4 6.4.9.9 1.7-1.8M4 11.9l.9.9 1.7-1.8M4 17.4l.9.9 1.7-1.8"/></svg></button>
       </div>
     </section>
     <aside class="settings-panel" id="settings-panel" aria-hidden="true">
       <header class="panel-heading">
-        <div><span class="eyebrow">${t("settings.companionLabel")}</span><h1>${t("settings.title")}</h1></div>
-        <button class="icon-button" id="close-settings" aria-label="${t("accessibility.closeSettings")}">×</button>
+        <div class="panel-identity">
+          <div class="panel-pet-preview"><img id="panel-pet-image" alt="" /></div>
+          <div><span class="eyebrow">${t("settings.companionLabel")}</span><h1>${t("settings.title")}</h1><p id="panel-pet-note">${t("settings.subtitle")}</p></div>
+        </div>
+        <button class="icon-button" id="close-settings" aria-label="${t("accessibility.closeSettings")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
       </header>
-      <section class="panel-section">
-        <label class="field-label" for="pet-select">${t("settings.petAppearance")}</label>
-        <select class="field" id="pet-select"></select>
-        <label class="field-label" for="size-input"><span>${t("settings.petSize")}</span><span id="size-label"></span></label>
-        <input class="range" id="size-input" type="range" min="48" max="144" step="4" />
-        <div class="setting-row"><span>${t("settings.alwaysOnTop")}</span><input id="always-top-input" type="checkbox" /></div>
-        <div class="setting-row"><span>${t("settings.autostart")} <small>${t("settings.autostartHint")}</small></span><input id="autostart-input" type="checkbox" /></div>
-        <div class="setting-row"><span>${t("settings.reduceMotion")}</span><input id="reduce-motion-input" type="checkbox" /></div>
-        <label class="field-label" for="language-input">${t("settings.language")}</label>
-        <select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select>
-      </section>
-      <section class="panel-section">
-        <div class="section-heading"><div><span class="eyebrow">${t("hydration.eyebrow")}</span><h2>${t("hydration.title")}</h2></div><strong id="water-label"></strong></div>
-        <div class="progress-track"><div class="progress-value" id="water-progress"></div></div>
-        <div class="progress-foot"><span id="water-remaining"></span><button id="panel-drink-button">${t("actions.drink")}</button></div>
-        <label class="field-label" for="target-mode-input">${t("hydration.targetMode")}</label>
-        <select class="field" id="target-mode-input"><option value="guideline">${t("hydration.guidelineMode")}</option><option value="custom">${t("hydration.customMode")}</option></select>
-        <div id="guideline-fields">
-          <label class="field-label" for="guideline-profile-input">${t("hydration.guidelineProfile")}</label>
-          <select class="field" id="guideline-profile-input"><option value="female">${t("hydration.adultFemale")}</option><option value="male">${t("hydration.adultMale")}</option></select>
+      <div class="panel-scroll">
+        <section class="hydration-card">
+          <div class="section-heading"><div><span class="eyebrow">${t("hydration.eyebrow")}</span><h2>${t("hydration.title")}</h2></div><strong class="metric" id="water-label"></strong></div>
+          <div class="progress-track"><div class="progress-value" id="water-progress"></div></div>
+          <div class="progress-foot"><span id="water-remaining"></span><button class="primary-button" id="panel-drink-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4s5 5.7 5 10a5 5 0 1 1-10 0c0-4.3 5-10 5-10Z"/></svg>${t("actions.drink")}</button></div>
+          <div class="form-grid hydration-options">
+            <div><label class="field-label" for="target-mode-input">${t("hydration.targetMode")}</label><select class="field" id="target-mode-input"><option value="guideline">${t("hydration.guidelineMode")}</option><option value="custom">${t("hydration.customMode")}</option></select></div>
+            <div id="guideline-fields"><label class="field-label" for="guideline-profile-input">${t("hydration.guidelineProfile")}</label><select class="field" id="guideline-profile-input"><option value="female">${t("hydration.adultFemale")}</option><option value="male">${t("hydration.adultMale")}</option></select></div>
+            <div id="custom-target-fields"><label class="field-label" for="target-input">${t("hydration.dailyTarget")}</label><input class="field" id="target-input" type="number" min="200" max="5000" step="50" /></div>
+            <div><label class="field-label" for="reminder-mode-input">${t("reminders.mode")}</label><select class="field" id="reminder-mode-input"><option value="interval">${t("reminders.intervalOption")}</option><option value="fixed">${t("reminders.fixedOption")}</option></select></div>
+            <div><label class="field-label" for="reminder-value-input" id="reminder-value-label"></label><input class="field" id="reminder-value-input" /></div>
+          </div>
           <p class="panel-tip">${t("hydration.guidelineHint")}</p>
-        </div>
-        <div id="custom-target-fields">
-          <label class="field-label" for="target-input">${t("hydration.dailyTarget")}</label>
-          <input class="field" id="target-input" type="number" min="200" max="5000" step="50" />
-        </div>
-        <label class="field-label" for="reminder-mode-input">${t("reminders.mode")}</label>
-        <select class="field" id="reminder-mode-input"><option value="interval">${t("reminders.intervalOption")}</option><option value="fixed">${t("reminders.fixedOption")}</option></select>
-        <label class="field-label" for="reminder-value-input" id="reminder-value-label"></label>
-        <input class="field" id="reminder-value-input" />
-      </section>
-      <section class="panel-section">
-        <div class="section-heading"><div><span class="eyebrow">${t("todo.eyebrow")}</span><h2>${t("todo.title")}</h2></div></div>
-        <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}">+</button></div>
-        <label class="field-label" for="todo-remind-input">${t("todo.remindAt")}</label>
-        <input class="field" id="todo-remind-input" type="datetime-local" />
-        <div class="todo-list" id="todo-list"></div>
-      </section>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading"><div><span class="section-kicker">01</span><h2>${t("settings.appearanceTitle")}</h2><p>${t("settings.appearanceHint")}</p></div></div>
+          <div class="form-grid">
+            <div><label class="field-label" for="pet-select">${t("settings.petAppearance")}</label><select class="field" id="pet-select"></select></div>
+            <div><label class="field-label" for="language-input">${t("settings.language")}</label><select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select></div>
+          </div>
+          <label class="field-label range-label" for="size-input"><span>${t("settings.petSize")}</span><span class="value-chip" id="size-label"></span></label>
+          <input class="range" id="size-input" type="range" min="48" max="144" step="4" />
+          <div class="switch-stack">
+            <label class="switch-row"><span>${t("settings.alwaysOnTop")}</span><span class="switch"><input id="always-top-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
+            <label class="switch-row"><span>${t("settings.autostart")}<small>${t("settings.autostartHint")}</small></span><span class="switch"><input id="autostart-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
+            <label class="switch-row"><span>${t("settings.reduceMotion")}</span><span class="switch"><input id="reduce-motion-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
+          </div>
+        </section>
+
+        <section class="panel-section todo-section">
+          <div class="section-heading"><div><span class="section-kicker">02</span><h2>${t("todo.title")}</h2></div></div>
+          <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <label class="field-label" for="todo-remind-input">${t("todo.remindAt")}</label>
+          <input class="field" id="todo-remind-input" type="datetime-local" />
+          <div class="todo-list" id="todo-list"></div>
+        </section>
+      </div>
+      <footer class="panel-footer"><span class="status-dot" aria-hidden="true"></span><span>${t("settings.contextHint")}</span></footer>
     </aside>
   </main>
 `;
@@ -231,7 +239,6 @@ const petStage = byId<HTMLElement>("pet-stage");
 const petSurface = byId<HTMLElement>("pet-surface");
 const settingsPanel = byId<HTMLElement>("settings-panel");
 const speechBubble = byId<HTMLElement>("speech-bubble");
-
 const showMessage = (message: string, duration = 3200) => {
   speechBubble.textContent = message;
   speechBubble.classList.add("visible");
@@ -290,7 +297,7 @@ const setPanelOpen = async (open: boolean) => {
   panelOpen = open;
   document.documentElement.dataset.panelOpen = open ? "true" : "false";
   settingsPanel.setAttribute("aria-hidden", open ? "false" : "true");
-  await appWindow.setSize(open ? new LogicalSize(390, 650) : collapsedWindowSize());
+  await appWindow.setSize(open ? new LogicalSize(460, 720) : collapsedWindowSize());
   if (state.position) await restorePosition();
 };
 
@@ -310,6 +317,9 @@ const render = () => {
   const progress = Math.min(100, target > 0 ? (state.waterDone / target) * 100 : 0);
   byId<HTMLImageElement>("pet-image").src = pet.portrait;
   byId<HTMLImageElement>("pet-image").alt = t(pet.nameKey);
+  byId<HTMLImageElement>("panel-pet-image").src = pet.portrait;
+  byId<HTMLImageElement>("panel-pet-image").alt = t(pet.nameKey);
+  byId<HTMLElement>("panel-pet-note").textContent = t(pet.noteKey);
   byId<HTMLSelectElement>("pet-select").value = state.petId;
   byId<HTMLInputElement>("size-input").value = String(state.petSize);
   byId<HTMLElement>("size-label").textContent = `${state.petSize}px`;
@@ -332,7 +342,7 @@ const render = () => {
   byId<HTMLSelectElement>("language-input").value = getLocale();
   byId<HTMLElement>("water-label").textContent = `${state.waterDone} / ${target} ml`;
   byId<HTMLElement>("water-progress").style.width = `${progress}%`;
-  byId<HTMLElement>("water-remaining").textContent = state.waterDone >= target ? t("hydration.goalDone") : t("hydration.remaining", { amount: target - state.waterDone });
+  byId<HTMLElement>("water-remaining").textContent = state.waterDone >= target ? t("hydration.goalDone") : t("hydration.remaining", { amount: Math.max(0, target - state.waterDone) });
   document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
   document.documentElement.style.setProperty("--pet-size", `${state.petSize}px`);
   document.documentElement.style.setProperty("--pet-accent", pet.accent);
@@ -362,11 +372,17 @@ const recordWater = (amount: number) => {
   resetWaterForNewDay();
   const target = targetAmount();
   const wasComplete = state.waterDone >= target;
-  state.waterDone = Math.min(target, state.waterDone + amount);
+  state.waterDone += amount;
   saveState();
   render();
   setPetAction(state.waterDone >= target && !wasComplete ? "happy" : "drink", 1200);
-  showMessage(state.waterDone >= target ? t("messages.hydrationGoalDone") : t("messages.hydrationRecorded"));
+  const remaining = Math.max(0, target - state.waterDone);
+  showMessage(t(state.waterDone >= target ? "messages.hydrationGoalDone" : "messages.hydrationRecorded", {
+    amount,
+    done: state.waterDone,
+    remaining,
+    target,
+  }), 5200);
 };
 
 const checkReminders = () => {
@@ -440,6 +456,11 @@ byId("feed-button").addEventListener("click", () => {
   showMessage(t("messages.feed"));
 });
 byId("todo-button").addEventListener("click", () => void setPanelOpen(true));
+petStage.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  if (panelOpen) return;
+  void invoke("show_pet_menu");
+});
 petSurface.addEventListener("click", () => {
   if (currentAction === "drag") return;
   setPetAction("touch", 900);
@@ -546,6 +567,7 @@ byId("todo-list").addEventListener("click", (event) => {
 });
 
 const bootstrap = async () => {
+  await listen("open-settings", () => void setPanelOpen(true));
   render();
   await appWindow.setTitle(t("app.title"));
   await appWindow.setAlwaysOnTop(state.alwaysOnTop);
