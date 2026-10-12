@@ -27,6 +27,21 @@
         "backgroundThrottling": "disabled",
         "skipTaskbar": true,
         "visible": true
+      },
+      {
+        "label": "todo",
+        "title": "Todo List",
+        "url": "todo.html",
+        "width": 620,
+        "height": 720,
+        "minWidth": 440,
+        "minHeight": 520,
+        "center": true,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "backgroundColor": "#F4EEE4",
+        "visible": false
       }
     ],
     "trayIcon": {

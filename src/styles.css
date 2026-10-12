@@ -166,23 +166,6 @@ html[data-panel-open="true"] .pet-stage { display: none; }
 .switch input:checked + span::after { transform: translateX(13px); }
 .switch input:focus-visible + span { box-shadow: 0 0 0 3px var(--accent-soft); }
 
-.todo-create { display: grid; grid-template-columns: minmax(0,1fr) 36px; gap: 7px; margin-top: 12px; }
-.add-button { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--accent-deep); color: #fff; transition: transform .12s ease, filter .15s ease; }
-.add-button svg { width: 16px; height: 16px; }
-.add-button:hover { filter: brightness(1.08); }
-.add-button:active { transform: scale(.94); }
-.todo-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.todo-item { display: grid; gap: 6px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in srgb, var(--paper-deep) 40%, transparent); }
-.todo-item > label,
-.todo-item > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.todo-item > label { justify-content: flex-start; color: var(--ink-soft); font-size: 12px; }
-.todo-item input { accent-color: var(--accent); }
-.todo-item time { color: var(--muted); font-size: 10px; }
-.todo-item button { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 7px; background: transparent; color: var(--muted); }
-.todo-item button:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
-.todo-item.done label span { color: var(--muted); text-decoration: line-through; }
-.empty-state { padding: 16px 10px 8px; color: var(--muted); text-align: center; font-size: 11px; }
-
 .panel-footer { display: flex; flex: 0 0 40px; align-items: center; gap: 7px; padding: 0 19px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--paper-deep) 45%, transparent); color: var(--muted); font-size: 10px; }
 .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #70a27c; box-shadow: 0 0 0 3px rgba(112,162,124,.12); }
 

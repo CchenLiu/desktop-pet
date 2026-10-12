@@ -45,7 +45,7 @@ test("native tray has an explicit icon, left-click restore, and a registered qui
   assert.match(rust, /RunEvent::ExitRequested/);
   assert.match(rust, /api\.prevent_exit\(\)/);
   assert.match(rust, /fn quit_app/);
-  assert.match(rust, /generate_handler!\[quit_app\]/);
+  assert.match(rust, /generate_handler!\[[^\]]*quit_app/);
   assert.match(cargo, /"image-png"/);
 });
 
@@ -143,10 +143,40 @@ test("pet interaction separates a short touch from threshold-based dragging", ()
   assert.doesNotMatch(main, /petSurface\.addEventListener\("pointerdown", async/);
 });
 
-test("todo quick action opens the panel at the todo section", () => {
+test("todo quick action opens a dedicated native todo window", () => {
   const main = read("src/main.ts");
-  assert.match(main, /id="todo-section"/);
-  assert.match(main, /scrollIntoView\(\{ block: "start", behavior: "smooth" \}\)/);
+  const rust = read("src-tauri/src/lib.rs");
+  const config = JSON.parse(read("src-tauri/tauri.conf.json"));
+  const todoWindow = config.app.windows.find(({ label }) => label === "todo");
+
+  assert.equal(todoWindow.url, "todo.html");
+  assert.equal(todoWindow.visible, false);
+  assert.equal(todoWindow.resizable, true);
+  assert.match(main, /invoke\("show_todo_window"\)/);
+  assert.doesNotMatch(main, /id="todo-section"/);
+  assert.match(rust, /fn show_todo_window/);
+  assert.match(rust, /get_webview_window\("todo"\)/);
+  assert.match(rust, /generate_handler!\[quit_app, show_todo_window\]/);
+});
+
+test("dedicated todo list supports add, complete, delete, filters, and priority labels", () => {
+  const todo = read("src/todo.ts");
+  const store = read("src/todo-store.ts");
+  const styles = read("src/todo.css");
+  const zh = read("src/i18n/zh-CN.ts");
+  const en = read("src/i18n/en-US.ts");
+
+  assert.match(todo, /const addTodo/);
+  assert.match(todo, /data-toggle=/);
+  assert.match(todo, /data-delete=/);
+  assert.match(todo, /data-filter=/);
+  assert.match(store, /"normal" \| "important" \| "urgent"/);
+  assert.match(styles, /\.priority-important/);
+  assert.match(styles, /\.priority-urgent/);
+  for (const locale of [zh, en]) {
+    assert.match(locale, /priorityImportant:/);
+    assert.match(locale, /priorityUrgent:/);
+  }
 });
 
 test("tray uses the bundled PNG directly instead of the Windows executable resource", () => {

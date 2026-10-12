@@ -18,9 +18,11 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import type { PetAction, PetAnimationAsset, PetSkinManifest } from "./pet-skin";
 import { SpritePlayer } from "./sprite-player";
+import { normalizeTodo, todoEventName, type Todo } from "./todo-store";
 
 type ReminderMode = "interval" | "fixed";
 type TargetMode = "guideline" | "custom";
@@ -33,14 +35,6 @@ type Pet = {
   accent: string;
   portrait: string;
   skin: PetSkinManifest;
-};
-
-type Todo = {
-  id: string;
-  title: string;
-  remindAt: string;
-  done: boolean;
-  notified: boolean;
 };
 
 type AppState = {
@@ -105,6 +99,7 @@ const appWindow = getCurrentWindow();
 let reminderTimer: number | undefined;
 let actionTimer: number | undefined;
 let messageTimer: number | undefined;
+let stopTodoSync: (() => void) | undefined;
 let panelOpen = false;
 let currentAction: PetAction = "idle";
 let petFacing: "left" | "right" = "right";
@@ -114,12 +109,6 @@ const localDateKey = (date = new Date()) => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-const toLocalDateTimeInput = (date: Date) => {
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${localDateKey(date)}T${hours}:${minutes}`;
 };
 
 const defaultState = (): AppState => ({
@@ -139,14 +128,6 @@ const defaultState = (): AppState => ({
   lastHydrationReminderAt: Date.now(),
   lastHydrationReminderKey: "",
   todos: [],
-});
-
-const normalizeTodo = (todo: Partial<Todo>): Todo => ({
-  id: todo.id ?? crypto.randomUUID(),
-  title: String(todo.title ?? ""),
-  remindAt: String(todo.remindAt ?? ""),
-  done: Boolean(todo.done),
-  notified: Boolean(todo.notified),
 });
 
 const loadState = (): AppState => {
@@ -185,8 +166,6 @@ const targetAmount = () => state.targetMode === "custom"
   ? Math.max(200, Math.min(5000, state.customTarget))
   : state.guidelineProfile === "male" ? 1700 : 1500;
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);
-
 document.body.innerHTML = `
   <main class="app-shell" id="app-shell">
     <section class="pet-stage" id="pet-stage" data-action="idle">
@@ -250,13 +229,6 @@ document.body.innerHTML = `
           </div>
         </section>
 
-        <section class="panel-section todo-section" id="todo-section">
-          <div class="section-heading"><div><span class="section-kicker">02</span><h2>${t("todo.title")}</h2></div></div>
-          <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
-          <label class="field-label" for="todo-remind-input">${t("todo.remindAt")}</label>
-          <input class="field" id="todo-remind-input" type="datetime-local" />
-          <div class="todo-list" id="todo-list"></div>
-        </section>
       </div>
       <footer class="panel-footer"><span class="status-dot" aria-hidden="true"></span><span>${t("settings.contextHint")}</span></footer>
     </aside>
@@ -390,23 +362,6 @@ const setPanelOpen = async (open: boolean) => {
   }
 };
 
-const openTodoPanel = async () => {
-  await setPanelOpen(true);
-  window.requestAnimationFrame(() => {
-    byId<HTMLElement>("todo-section").scrollIntoView({ block: "start", behavior: "smooth" });
-  });
-};
-
-const renderTodos = () => {
-  const list = byId<HTMLElement>("todo-list");
-  list.innerHTML = state.todos.length
-    ? state.todos.map((todo) => {
-      const time = todo.remindAt ? new Date(todo.remindAt).toLocaleString(getLocale(), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : t("todo.noReminder");
-      return `<div class="todo-item ${todo.done ? "done" : ""}"><label><input type="checkbox" data-todo-toggle="${todo.id}" ${todo.done ? "checked" : ""}/><span>${escapeHtml(todo.title)}</span></label><div><time>${escapeHtml(time)}</time><button data-todo-delete="${todo.id}" aria-label="${t("todo.delete")}">×</button></div></div>`;
-    }).join("")
-    : `<div class="empty-state">${t("todo.empty")}</div>`;
-};
-
 const render = () => {
   const pet = selectedPet();
   const target = targetAmount();
@@ -443,7 +398,6 @@ const render = () => {
   document.documentElement.style.setProperty("--pet-size", `${state.petSize}px`);
   document.documentElement.style.setProperty("--pet-accent", pet.accent);
   setPetAction(currentAction, 0);
-  renderTodos();
 };
 
 const notify = async (title: string, body: string) => {
@@ -528,21 +482,7 @@ const updateAutostart = async (enabled: boolean) => {
   }
 };
 
-const addTodo = () => {
-  const input = byId<HTMLInputElement>("todo-input");
-  const remindInput = byId<HTMLInputElement>("todo-remind-input");
-  const title = input.value.trim();
-  if (!title) return;
-  state.todos.unshift({ id: crypto.randomUUID(), title, remindAt: remindInput.value, done: false, notified: false });
-  input.value = "";
-  remindInput.value = toLocalDateTimeInput(new Date(Date.now() + 60 * 60_000));
-  saveState();
-  renderTodos();
-  showMessage(t("messages.todoAdded"));
-};
-
 byId<HTMLSelectElement>("pet-select").innerHTML = pets.map((pet) => `<option value="${pet.id}">${t(pet.nameKey)}</option>`).join("");
-byId<HTMLInputElement>("todo-remind-input").value = toLocalDateTimeInput(new Date(Date.now() + 60 * 60_000));
 
 byId("settings-button").addEventListener("click", () => void setPanelOpen(true));
 byId("context-settings-button").addEventListener("click", () => void setPanelOpen(true));
@@ -554,7 +494,7 @@ byId("feed-button").addEventListener("click", () => {
   setPetAction("feed", 1200);
   showMessage(t("messages.feed"));
 });
-byId("todo-button").addEventListener("click", () => void openTodoPanel());
+byId("todo-button").addEventListener("click", () => void invoke("show_todo_window"));
 petStage.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   if (panelOpen) return;
@@ -666,35 +606,13 @@ byId<HTMLInputElement>("reminder-value-input").addEventListener("change", (event
   state.lastHydrationReminderAt = Date.now();
   saveState();
 });
-byId("add-todo").addEventListener("click", addTodo);
-byId<HTMLInputElement>("todo-input").addEventListener("keydown", (event) => {
-  if (event.key === "Enter") addTodo();
-});
-byId("todo-list").addEventListener("change", (event) => {
-  const target = event.target as HTMLInputElement;
-  const id = target.dataset.todoToggle;
-  const todo = state.todos.find((item) => item.id === id);
-  if (!todo) return;
-  todo.done = target.checked;
-  saveState();
-  renderTodos();
-  if (todo.done) {
-    setPetAction("happy", 1200);
-    showMessage(t("messages.todoDone"));
-  }
-});
-byId("todo-list").addEventListener("click", (event) => {
-  const target = event.target as HTMLButtonElement;
-  const id = target.dataset.todoDelete;
-  if (!id) return;
-  state.todos = state.todos.filter((todo) => todo.id !== id);
-  saveState();
-  renderTodos();
-});
-
 const bootstrap = async () => {
   render();
   preloadPetAnimations(selectedPet());
+  stopTodoSync = await listen<Todo[]>(todoEventName, ({ payload }) => {
+    state.todos = payload.map(normalizeTodo);
+    saveState();
+  });
   await appWindow.setTitle(t("app.title"));
   await appWindow.setAlwaysOnTop(state.alwaysOnTop);
   await appWindow.setSize(collapsedWindowSize());
@@ -715,5 +633,6 @@ window.addEventListener("beforeunload", () => {
   if (reminderTimer) window.clearInterval(reminderTimer);
   if (actionTimer) window.clearTimeout(actionTimer);
   if (messageTimer) window.clearTimeout(messageTimer);
+  stopTodoSync?.();
   void savePosition();
 });

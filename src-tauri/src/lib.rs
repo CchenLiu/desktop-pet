@@ -11,6 +11,15 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+fn show_todo_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("todo") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let tray_locale = locale::load();
     let show = MenuItem::with_id(app, "show", &tray_locale.show, true, None::<&str>)?;
@@ -49,7 +58,7 @@ pub fn run() {
     }
 
     let app = tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![quit_app])
+        .invoke_handler(tauri::generate_handler![quit_app, show_todo_window])
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
