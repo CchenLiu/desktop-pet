@@ -1,4 +1,4 @@
-export type PetAction = "idle" | "touch" | "drag" | "drink" | "feed" | "remind" | "happy";
+export type PetAction = "idle" | "touch" | "run" | "drink" | "feed" | "remind" | "happy";
 
 export type PetAnimationAsset = {
   src: string;

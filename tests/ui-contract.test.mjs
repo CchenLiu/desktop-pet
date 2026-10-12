@@ -93,37 +93,51 @@ test("expanded settings panel keeps the redesigned hierarchy", () => {
   assert.match(styles, /\.hydration-card/);
 });
 
-test("Alaskan pet uses frame-based sprite animations with static fallback", () => {
+test("all four pets use complete frame-based sprite animation sets", () => {
   const main = read("src/main.ts");
   const player = read("src/sprite-player.ts");
 
   assert.match(main, /canvas class="pet-sprite"/);
-  assert.match(main, /idle: \{ src: animation\("alaskan", "idle"\), frames: 16/);
-  assert.match(main, /touch: \{ src: animation\("alaskan", "touch"\), frames: 16/);
-  assert.match(main, /drink: \{ src: animation\("alaskan", "drink"\), frames: 16/);
-  assert.match(main, /feed: \{ src: animation\("alaskan", "feed"\), frames: 16/);
+  for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
+    assert.match(main, new RegExp(`skin: animatedSkin\\("${pet}"\\)`));
+  }
+  for (const action of ["idle", "touch", "drink", "feed", "run"]) {
+    assert.match(main, new RegExp(`${action}: animationAsset\\(id, "${action}"`));
+  }
   assert.match(player, /requestAnimationFrame/);
   assert.match(player, /context\.drawImage/);
 });
 
-test("Alaskan sprite sheets use isolated 4 by 4 cells and smooth frame rates", () => {
+test("pet sprite sheets use isolated 4 by 4 cells and higher frame rates", () => {
   const main = read("src/main.ts");
-  assert.match(main, /idle: \{[^}]*frames: 16[^}]*columns: 4[^}]*rows: 4[^}]*fps: [4-6]/);
-  for (const action of ["touch", "drink", "feed"]) {
-    assert.match(main, new RegExp(`${action}: \\{[^}]*frames: 16[^}]*columns: 4[^}]*rows: 4[^}]*fps: (?:1[0-9]|[2-9][0-9])`));
-    const png = readFileSync(new URL(`../src/assets/pets/alaskan/animations/${action}.png`, import.meta.url));
-    const width = png.readUInt32BE(16);
-    const height = png.readUInt32BE(20);
-    assert.equal(width, height, `${action} sprite sheet must be square`);
-    assert.equal(width % 4, 0, `${action} sprite sheet must divide into exact grid cells`);
+  assert.match(main, /idle: animationAsset\(id, "idle", 10, true\)/);
+  assert.match(main, /touch: animationAsset\(id, "touch", 16, false\)/);
+  assert.match(main, /drink: animationAsset\(id, "drink", 16, false\)/);
+  assert.match(main, /feed: animationAsset\(id, "feed", 16, false\)/);
+  assert.match(main, /run: animationAsset\(id, "run", 20, true\)/);
+  for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
+    for (const action of ["idle", "touch", "drink", "feed", "run"]) {
+      const png = readFileSync(new URL(`../src/assets/pets/${pet}/animations/${action}.png`, import.meta.url));
+      const width = png.readUInt32BE(16);
+      const height = png.readUInt32BE(20);
+      assert.equal(width, height, `${pet}/${action} sprite sheet must be square`);
+      assert.equal(width % 4, 0, `${pet}/${action} sprite sheet must divide into exact grid cells`);
+      assert.equal(png[25], 6, `${pet}/${action} sprite sheet must retain an alpha channel`);
+    }
   }
 });
 
 test("pet interaction separates a short touch from threshold-based dragging", () => {
   const main = read("src/main.ts");
+  const player = read("src/sprite-player.ts");
   assert.match(main, /const petDragThreshold = 6/);
   assert.match(main, /petSurface\.addEventListener\("pointermove"/);
   assert.match(main, /triggerPetTouch/);
+  assert.match(main, /horizontalDelta < 0 \? "left" : "right"/);
+  assert.match(main, /setPetAction\("run", 0\)/);
+  assert.match(main, /flipX: action === "run" && petFacing === "left"/);
+  assert.match(player, /context\.scale\(-1, 1\)/);
+  assert.match(player, /async preload\(assets: PetAnimationAsset\[\]\)/);
   assert.doesNotMatch(main, /petSurface\.addEventListener\("pointerdown", async/);
 });
 

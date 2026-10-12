@@ -3,6 +3,7 @@ import type { PetAnimationAsset } from "./pet-skin";
 type PlayOptions = {
   reduceMotion: boolean;
   size: number;
+  flipX?: boolean;
 };
 
 export class SpritePlayer {
@@ -18,6 +19,11 @@ export class SpritePlayer {
     this.animationFrame = undefined;
   }
 
+  async preload(assets: PetAnimationAsset[]) {
+    const sources = [...new Set(assets.map(({ src }) => src))];
+    await Promise.allSettled(sources.map((src) => this.load(src)));
+  }
+
   async play(asset: PetAnimationAsset, options: PlayOptions) {
     this.stop();
     const generation = this.generation;
@@ -29,7 +35,7 @@ export class SpritePlayer {
       if (generation !== this.generation) return;
       const elapsedFrames = options.reduceMotion ? 0 : Math.floor(((now - startedAt) / 1000) * asset.fps);
       const frame = asset.loop ? elapsedFrames % asset.frames : Math.min(elapsedFrames, asset.frames - 1);
-      this.draw(image, frame, asset, options.size);
+      this.draw(image, frame, asset, options.size, options.flipX ?? false);
       if (!options.reduceMotion && (asset.loop || elapsedFrames < asset.frames - 1)) {
         this.animationFrame = requestAnimationFrame(render);
       }
@@ -50,7 +56,7 @@ export class SpritePlayer {
     return pending;
   }
 
-  private draw(image: HTMLImageElement, frame: number, asset: PetAnimationAsset, cssSize: number) {
+  private draw(image: HTMLImageElement, frame: number, asset: PetAnimationAsset, cssSize: number, flipX: boolean) {
     const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
     const outputSize = Math.round(cssSize * pixelRatio);
     if (this.canvas.width !== outputSize || this.canvas.height !== outputSize) {
@@ -68,6 +74,11 @@ export class SpritePlayer {
     const row = Math.floor(frame / asset.columns);
     const safeInset = 1;
 
+    context.save();
+    if (flipX) {
+      context.translate(outputSize, 0);
+      context.scale(-1, 1);
+    }
     context.drawImage(
       image,
       column * sourceFrameWidth + safeInset,
@@ -79,5 +90,6 @@ export class SpritePlayer {
       outputSize,
       outputSize,
     );
+    context.restore();
   }
 }

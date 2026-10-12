@@ -187,8 +187,6 @@ html[data-panel-open="true"] .pet-stage { display: none; }
 .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #70a27c; box-shadow: 0 0 0 3px rgba(112,162,124,.12); }
 
 .pet-stage[data-action="touch"] .pet-image { animation: touch-wiggle .85s ease; }
-.pet-stage[data-action="drag"] .pet-image,
-.pet-stage[data-action="drag"] .pet-sprite { animation: drag-float .55s ease-in-out infinite alternate; }
 .pet-stage[data-action="drink"] .pet-image { animation: drink-nod 1.1s ease; }
 .pet-stage[data-action="drink"] .action-prop { opacity: 1; animation: prop-pop 1.1s ease; }
 .pet-stage[data-action="drink"] .action-prop::after { content: "💧"; }
@@ -208,7 +206,6 @@ html[data-reduce-motion="true"] *::after { animation-duration: .001ms !important
 @keyframes panel-in { from { opacity: 0; transform: translateY(7px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes idle-breathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.012); } }
 @keyframes touch-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-4deg) translateY(-2px); } 60% { transform: rotate(4deg) translateY(-3px); } }
-@keyframes drag-float { from { transform: translateY(-2px) rotate(-2deg); } to { transform: translateY(-7px) rotate(2deg); } }
 @keyframes drink-nod { 0%,100% { transform: rotate(0); } 35%,65% { transform: translateY(3px) rotate(3deg); } }
 @keyframes feed-chew { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.96) translateY(2px); } }
 @keyframes remind-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
