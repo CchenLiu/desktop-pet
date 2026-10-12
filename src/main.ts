@@ -44,7 +44,7 @@ type Todo = {
 };
 
 type AppState = {
-  version: 2;
+  version: 3;
   petId: string;
   petSize: number;
   alwaysOnTop: boolean;
@@ -76,10 +76,10 @@ const skin = (id: string, animations: PetSkinManifest["animations"] = {}): PetSk
 });
 
 const alaskanSkin = skin("alaskan", {
-  idle: { src: animation("alaskan", "idle"), frames: 8, fps: 3, loop: true },
-  touch: { src: animation("alaskan", "touch"), frames: 8, fps: 9, loop: false },
-  drink: { src: animation("alaskan", "drink"), frames: 8, fps: 7, loop: false },
-  feed: { src: animation("alaskan", "feed"), frames: 8, fps: 8, loop: false },
+  idle: { src: animation("alaskan", "idle"), frames: 16, columns: 4, rows: 4, fps: 4, loop: true },
+  touch: { src: animation("alaskan", "touch"), frames: 16, columns: 4, rows: 4, fps: 12, loop: false },
+  drink: { src: animation("alaskan", "drink"), frames: 16, columns: 4, rows: 4, fps: 12, loop: false },
+  feed: { src: animation("alaskan", "feed"), frames: 16, columns: 4, rows: 4, fps: 12, loop: false },
 });
 
 const pets: Pet[] = [
@@ -89,8 +89,9 @@ const pets: Pet[] = [
   { id: "maine-coon", nameKey: "pets.maineCoon.name", noteKey: "pets.maineCoon.note", accent: "#8c6d4f", portrait: portrait("maine-coon"), skin: skin("maine-coon") },
 ];
 
-const stateKey = "desktop-pet-state-v2";
-const legacyStateKey = "desktop-pet-state-v1";
+const stateKey = "desktop-pet-state-v3";
+const legacyStateKey = "desktop-pet-state-v2";
+const oldestStateKey = "desktop-pet-state-v1";
 const appWindow = getCurrentWindow();
 let reminderTimer: number | undefined;
 let actionTimer: number | undefined;
@@ -112,9 +113,9 @@ const toLocalDateTimeInput = (date: Date) => {
 };
 
 const defaultState = (): AppState => ({
-  version: 2,
+  version: 3,
   petId: pets[0].id,
-  petSize: 72,
+  petSize: 100,
   alwaysOnTop: true,
   autostart: false,
   reduceMotion: false,
@@ -141,18 +142,21 @@ const normalizeTodo = (todo: Partial<Todo>): Todo => ({
 const loadState = (): AppState => {
   try {
     const current = JSON.parse(localStorage.getItem(stateKey) ?? "null") as Partial<AppState> | null;
-    const legacy = JSON.parse(localStorage.getItem(legacyStateKey) ?? "null") as ({ scale?: number; dailyTarget?: number; todos?: Partial<Todo>[] } & Partial<AppState>) | null;
-    const stored = current ?? legacy;
+    const legacy = JSON.parse(localStorage.getItem(legacyStateKey) ?? "null") as Partial<AppState> | null;
+    const oldest = JSON.parse(localStorage.getItem(oldestStateKey) ?? "null") as ({ scale?: number; dailyTarget?: number; todos?: Partial<Todo>[] } & Partial<AppState>) | null;
+    const stored = current ?? legacy ?? oldest;
     if (!stored) return defaultState();
+    const storedPetSize = "petSize" in stored ? Number(stored.petSize) : Math.round(72 * Number(oldest?.scale ?? 1));
+    const migratedPetSize = !current && legacy && storedPetSize === 72 ? 100 : storedPetSize;
     const next: AppState = {
       ...defaultState(),
       ...stored,
-      version: 2,
-      petSize: "petSize" in stored ? Number(stored.petSize) : Math.round(72 * Number(legacy?.scale ?? 1)),
-      customTarget: "customTarget" in stored ? Number(stored.customTarget) : Number(legacy?.dailyTarget ?? 1600),
+      version: 3,
+      petSize: migratedPetSize,
+      customTarget: "customTarget" in stored ? Number(stored.customTarget) : Number(oldest?.dailyTarget ?? 1600),
       todos: (stored.todos ?? []).map(normalizeTodo),
     };
-    next.petSize = Math.max(48, Math.min(144, next.petSize || 72));
+    next.petSize = Math.max(48, Math.min(220, next.petSize || 100));
     if (next.waterDate !== localDateKey()) {
       next.waterDate = localDateKey();
       next.waterDone = 0;
@@ -228,7 +232,7 @@ document.body.innerHTML = `
             <div><label class="field-label" for="language-input">${t("settings.language")}</label><select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select></div>
           </div>
           <label class="field-label range-label" for="size-input"><span>${t("settings.petSize")}</span><span class="value-chip" id="size-label"></span></label>
-          <input class="range" id="size-input" type="range" min="48" max="144" step="4" />
+          <input class="range" id="size-input" type="range" min="48" max="220" step="4" />
           <div class="switch-stack">
             <label class="switch-row"><span>${t("settings.alwaysOnTop")}</span><span class="switch"><input id="always-top-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
             <label class="switch-row"><span>${t("settings.autostart")}<small>${t("settings.autostartHint")}</small></span><span class="switch"><input id="autostart-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
@@ -236,7 +240,7 @@ document.body.innerHTML = `
           </div>
         </section>
 
-        <section class="panel-section todo-section">
+        <section class="panel-section todo-section" id="todo-section">
           <div class="section-heading"><div><span class="section-kicker">02</span><h2>${t("todo.title")}</h2></div></div>
           <div class="todo-create"><input class="field" id="todo-input" placeholder="${t("todo.placeholder")}" /><button class="add-button" id="add-todo" aria-label="${t("todo.add")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
           <label class="field-label" for="todo-remind-input">${t("todo.remindAt")}</label>
@@ -258,6 +262,8 @@ const petSprite = byId<HTMLCanvasElement>("pet-sprite");
 const spritePlayer = new SpritePlayer(petSprite);
 const petContextMenu = byId<HTMLElement>("pet-context-menu");
 let collapsedPositionBeforePanel: { x: number; y: number } | undefined;
+const petDragThreshold = 6;
+let petPointer: { id: number; x: number; y: number; dragging: boolean } | undefined;
 
 const hidePetContextMenu = () => {
   petContextMenu.hidden = true;
@@ -364,6 +370,13 @@ const setPanelOpen = async (open: boolean) => {
     collapsedPositionBeforePanel = undefined;
     saveState();
   }
+};
+
+const openTodoPanel = async () => {
+  await setPanelOpen(true);
+  window.requestAnimationFrame(() => {
+    byId<HTMLElement>("todo-section").scrollIntoView({ block: "start", behavior: "smooth" });
+  });
 };
 
 const renderTodos = () => {
@@ -523,7 +536,7 @@ byId("feed-button").addEventListener("click", () => {
   setPetAction("feed", 1200);
   showMessage(t("messages.feed"));
 });
-byId("todo-button").addEventListener("click", () => void setPanelOpen(true));
+byId("todo-button").addEventListener("click", () => void openTodoPanel());
 petStage.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   if (panelOpen) return;
@@ -537,25 +550,41 @@ document.addEventListener("pointerdown", (event) => {
   if (!petContextMenu.contains(event.target as Node)) hidePetContextMenu();
 });
 window.addEventListener("blur", hidePetContextMenu);
-petSurface.addEventListener("click", () => {
-  if (currentAction === "drag") return;
+const triggerPetTouch = () => {
   setPetAction("touch", 900);
   showMessage(t("messages.petInteraction"));
-});
-petSurface.addEventListener("pointerdown", async (event) => {
+};
+petSurface.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || panelOpen) return;
+  petPointer = { id: event.pointerId, x: event.clientX, y: event.clientY, dragging: false };
+  petSurface.setPointerCapture(event.pointerId);
+});
+petSurface.addEventListener("pointermove", async (event) => {
+  if (!petPointer || petPointer.id !== event.pointerId || petPointer.dragging) return;
+  if (Math.hypot(event.clientX - petPointer.x, event.clientY - petPointer.y) < petDragThreshold) return;
+  petPointer.dragging = true;
   setPetAction("drag", 0);
   try {
     await appWindow.startDragging();
     await savePosition();
   } finally {
+    petPointer = undefined;
     setPetAction("idle", 0);
   }
 });
+petSurface.addEventListener("pointerup", (event) => {
+  if (!petPointer || petPointer.id !== event.pointerId) return;
+  const wasDragging = petPointer.dragging;
+  petPointer = undefined;
+  if (petSurface.hasPointerCapture(event.pointerId)) petSurface.releasePointerCapture(event.pointerId);
+  if (!wasDragging) triggerPetTouch();
+});
+petSurface.addEventListener("pointercancel", () => {
+  petPointer = undefined;
+});
 petSurface.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
-    setPetAction("touch", 900);
-    showMessage(t("messages.petInteraction"));
+    triggerPetTouch();
   }
 });
 

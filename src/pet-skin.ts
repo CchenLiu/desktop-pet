@@ -3,6 +3,8 @@ export type PetAction = "idle" | "touch" | "drag" | "drink" | "feed" | "remind" 
 export type PetAnimationAsset = {
   src: string;
   frames: number;
+  columns: number;
+  rows: number;
   fps: number;
   loop: boolean;
 };

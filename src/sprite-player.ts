@@ -29,7 +29,7 @@ export class SpritePlayer {
       if (generation !== this.generation) return;
       const elapsedFrames = options.reduceMotion ? 0 : Math.floor(((now - startedAt) / 1000) * asset.fps);
       const frame = asset.loop ? elapsedFrames % asset.frames : Math.min(elapsedFrames, asset.frames - 1);
-      this.draw(image, frame, asset.frames, options.size);
+      this.draw(image, frame, asset, options.size);
       if (!options.reduceMotion && (asset.loop || elapsedFrames < asset.frames - 1)) {
         this.animationFrame = requestAnimationFrame(render);
       }
@@ -50,7 +50,7 @@ export class SpritePlayer {
     return pending;
   }
 
-  private draw(image: HTMLImageElement, frame: number, frameCount: number, cssSize: number) {
+  private draw(image: HTMLImageElement, frame: number, asset: PetAnimationAsset, cssSize: number) {
     const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
     const outputSize = Math.round(cssSize * pixelRatio);
     if (this.canvas.width !== outputSize || this.canvas.height !== outputSize) {
@@ -62,24 +62,22 @@ export class SpritePlayer {
     if (!context) return;
     context.clearRect(0, 0, outputSize, outputSize);
 
-    const sourceFrameWidth = image.naturalWidth / frameCount;
-    const sourceTop = image.naturalHeight * 0.08;
-    const sourceHeight = image.naturalHeight * 0.76;
-    const naturalRatio = sourceFrameWidth / sourceHeight;
-    const drawHeight = outputSize;
-    const drawWidth = Math.min(outputSize, drawHeight * naturalRatio * 1.45);
-    const drawX = (outputSize - drawWidth) / 2;
+    const sourceFrameWidth = image.naturalWidth / asset.columns;
+    const sourceFrameHeight = image.naturalHeight / asset.rows;
+    const column = frame % asset.columns;
+    const row = Math.floor(frame / asset.columns);
+    const safeInset = 1;
 
     context.drawImage(
       image,
-      frame * sourceFrameWidth,
-      sourceTop,
-      sourceFrameWidth,
-      sourceHeight,
-      drawX,
+      column * sourceFrameWidth + safeInset,
+      row * sourceFrameHeight + safeInset,
+      sourceFrameWidth - safeInset * 2,
+      sourceFrameHeight - safeInset * 2,
       0,
-      drawWidth,
-      drawHeight,
+      0,
+      outputSize,
+      outputSize,
     );
   }
 }

@@ -30,17 +30,20 @@ test("pet context menu keeps the custom styled surface", () => {
 
 test("native tray has an explicit icon, left-click restore, and a registered quit command", () => {
   const rust = read("src-tauri/src/lib.rs");
+  const config = JSON.parse(read("src-tauri/tauri.conf.json"));
   const cargo = read("src-tauri/Cargo.toml");
 
-  assert.match(rust, /include_bytes!\("\.\.\/icons\/32x32\.png"\)/);
-  assert.match(rust, /Image::from_app_icon_resource\(32\)/);
-  assert.match(rust, /\.icon\(tray_icon\)/);
-  assert.match(rust, /TrayIconBuilder::with_id\("desktop-pet-tray"\)/);
-  assert.match(rust, /app\.manage\(tray\)/);
+  assert.equal(config.app.trayIcon.id, "desktop-pet-tray");
+  assert.equal(config.app.trayIcon.iconPath, "icons/32x32.png");
+  assert.equal(config.app.trayIcon.showMenuOnLeftClick, false);
+  assert.match(rust, /tray_by_id\("desktop-pet-tray"\)/);
+  assert.doesNotMatch(rust, /TrayIconBuilder/);
+  assert.doesNotMatch(rust, /app\.manage\(tray\)/);
   assert.doesNotMatch(rust, /system tray is unavailable/);
-  assert.match(rust, /\.show_menu_on_left_click\(false\)/);
   assert.match(rust, /TrayIconEvent::Click/);
   assert.match(rust, /MouseButton::Left/);
+  assert.match(rust, /RunEvent::ExitRequested/);
+  assert.match(rust, /api\.prevent_exit\(\)/);
   assert.match(rust, /fn quit_app/);
   assert.match(rust, /generate_handler!\[quit_app\]/);
   assert.match(cargo, /"image-png"/);
@@ -95,10 +98,60 @@ test("Alaskan pet uses frame-based sprite animations with static fallback", () =
   const player = read("src/sprite-player.ts");
 
   assert.match(main, /canvas class="pet-sprite"/);
-  assert.match(main, /idle: \{ src: animation\("alaskan", "idle"\), frames: 8/);
-  assert.match(main, /touch: \{ src: animation\("alaskan", "touch"\), frames: 8/);
-  assert.match(main, /drink: \{ src: animation\("alaskan", "drink"\), frames: 8/);
-  assert.match(main, /feed: \{ src: animation\("alaskan", "feed"\), frames: 8/);
+  assert.match(main, /idle: \{ src: animation\("alaskan", "idle"\), frames: 16/);
+  assert.match(main, /touch: \{ src: animation\("alaskan", "touch"\), frames: 16/);
+  assert.match(main, /drink: \{ src: animation\("alaskan", "drink"\), frames: 16/);
+  assert.match(main, /feed: \{ src: animation\("alaskan", "feed"\), frames: 16/);
   assert.match(player, /requestAnimationFrame/);
   assert.match(player, /context\.drawImage/);
+});
+
+test("Alaskan sprite sheets use isolated 4 by 4 cells and smooth frame rates", () => {
+  const main = read("src/main.ts");
+  assert.match(main, /idle: \{[^}]*frames: 16[^}]*columns: 4[^}]*rows: 4[^}]*fps: [4-6]/);
+  for (const action of ["touch", "drink", "feed"]) {
+    assert.match(main, new RegExp(`${action}: \\{[^}]*frames: 16[^}]*columns: 4[^}]*rows: 4[^}]*fps: (?:1[0-9]|[2-9][0-9])`));
+    const png = readFileSync(new URL(`../src/assets/pets/alaskan/animations/${action}.png`, import.meta.url));
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    assert.equal(width, height, `${action} sprite sheet must be square`);
+    assert.equal(width % 4, 0, `${action} sprite sheet must divide into exact grid cells`);
+  }
+});
+
+test("pet interaction separates a short touch from threshold-based dragging", () => {
+  const main = read("src/main.ts");
+  assert.match(main, /const petDragThreshold = 6/);
+  assert.match(main, /petSurface\.addEventListener\("pointermove"/);
+  assert.match(main, /triggerPetTouch/);
+  assert.doesNotMatch(main, /petSurface\.addEventListener\("pointerdown", async/);
+});
+
+test("todo quick action opens the panel at the todo section", () => {
+  const main = read("src/main.ts");
+  assert.match(main, /id="todo-section"/);
+  assert.match(main, /scrollIntoView\(\{ block: "start", behavior: "smooth" \}\)/);
+});
+
+test("tray uses the bundled PNG directly instead of the Windows executable resource", () => {
+  const rust = read("src-tauri/src/lib.rs");
+  const config = JSON.parse(read("src-tauri/tauri.conf.json"));
+  assert.equal(config.app.trayIcon.iconPath, "icons/32x32.png");
+  assert.doesNotMatch(rust, /from_app_icon_resource/);
+});
+
+test("pet size defaults to 100 and supports a larger 220 maximum", () => {
+  const main = read("src/main.ts");
+  assert.match(main, /petSize: 100/);
+  assert.match(main, /Math\.min\(220, next\.petSize/);
+  assert.match(main, /id="size-input" type="range" min="48" max="220"/);
+});
+
+test("runtime uses a writable per-user data directory with an environment override", () => {
+  const rust = read("src-tauri/src/lib.rs");
+  assert.match(rust, /DESKTOP_PET_DATA_DIR/);
+  assert.match(rust, /LOCALAPPDATA/);
+  assert.match(rust, /join\("DesktopPet"\)/);
+  assert.match(rust, /create_dir_all\(&data_dir\)/);
+  assert.match(rust, /app_directories_override/);
 });

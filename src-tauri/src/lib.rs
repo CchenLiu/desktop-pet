@@ -1,8 +1,7 @@
 use tauri::{
-    image::Image,
     menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
+    tray::{MouseButton, MouseButtonState, TrayIconEvent},
+    Manager, RunEvent, WindowEvent,
 };
 
 mod locale;
@@ -12,30 +11,62 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-fn setup_tray(app: &tauri::App) -> tauri::Result<TrayIcon> {
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let tray_locale = locale::load();
     let show = MenuItem::with_id(app, "show", &tray_locale.show, true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", &tray_locale.hide, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", &tray_locale.quit, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &hide, &quit])?;
 
-    #[cfg(target_os = "windows")]
-    let tray_icon = Image::from_app_icon_resource(32)?;
-    #[cfg(not(target_os = "windows"))]
-    let tray_icon = Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
-    let tray = TrayIconBuilder::with_id("desktop-pet-tray")
-        .icon(tray_icon)
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .tooltip(&tray_locale.tooltip)
-        .on_tray_icon_event(|tray, event| {
+    let tray = app
+        .tray_by_id("desktop-pet-tray")
+        .expect("configured desktop pet tray icon is missing");
+    tray.set_menu(Some(menu))?;
+    tray.set_tooltip(Some(&tray_locale.tooltip))?;
+    tray.set_visible(true)?;
+    Ok(())
+}
+
+fn writable_data_root() -> std::path::PathBuf {
+    if let Some(override_path) = std::env::var_os("DESKTOP_PET_DATA_DIR") {
+        return override_path.into();
+    }
+
+    std::env::var_os("LOCALAPPDATA")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("DesktopPet")
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let mut context = tauri::generate_context!();
+    let data_dir = writable_data_root();
+    if std::fs::create_dir_all(&data_dir).is_ok() {
+        context.config_mut().app.app_directories_override = Some(
+            tauri::utils::config::AppDirectoriesOverride::Root(data_dir),
+        );
+    }
+
+    let app = tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![quit_app])
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![]),
+        ))
+        .plugin(tauri_plugin_notification::init())
+        .setup(|app| {
+            setup_tray(app)?;
+            Ok(())
+        })
+        .on_tray_icon_event(|app, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
                 ..
             } = event
             {
-                if let Some(window) = tray.app_handle().get_webview_window("main") {
+                if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
                 }
@@ -56,38 +87,18 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<TrayIcon> {
                 }
             }
         })
-        .build(app)?;
-    tray.set_visible(true)?;
-    Ok(tray)
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    let mut context = tauri::generate_context!();
-    if let Ok(data_dir) = std::env::var("DESKTOP_PET_DATA_DIR") {
-        context.config_mut().app.app_directories_override = Some(
-            tauri::utils::config::AppDirectoriesOverride::Root(data_dir.into()),
-        );
-    }
-
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![quit_app])
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec![]),
-        ))
-        .plugin(tauri_plugin_notification::init())
-        .setup(|app| {
-            let tray = setup_tray(app)?;
-            app.manage(tray);
-            Ok(())
-        })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
             }
         })
-        .run(context)
-        .expect("error while running desktop pet");
+        .build(context)
+        .expect("error while building desktop pet");
+
+    app.run(|_, event| {
+        if let RunEvent::ExitRequested { api, .. } = event {
+            api.prevent_exit();
+        }
+    });
 }

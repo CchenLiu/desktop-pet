@@ -29,6 +29,12 @@
         "visible": true
       }
     ],
+    "trayIcon": {
+      "id": "desktop-pet-tray",
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": false,
+      "showMenuOnLeftClick": false
+    },
     "security": {
       "csp": null
     }
