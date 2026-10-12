@@ -138,6 +138,8 @@ test("pet interaction separates a short touch from threshold-based dragging", ()
   assert.match(main, /flipX: action === "run" && petFacing === "left"/);
   assert.match(player, /context\.scale\(-1, 1\)/);
   assert.match(player, /async preload\(assets: PetAnimationAsset\[\]\)/);
+  assert.match(main, /preloadPetAnimations\(selectedPet\(\)\)/);
+  assert.doesNotMatch(main, /spritePlayer\.preload\(pets\.flatMap/);
   assert.doesNotMatch(main, /petSurface\.addEventListener\("pointerdown", async/);
 });
 

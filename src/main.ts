@@ -270,6 +270,10 @@ const speechBubble = byId<HTMLElement>("speech-bubble");
 const petImage = byId<HTMLImageElement>("pet-image");
 const petSprite = byId<HTMLCanvasElement>("pet-sprite");
 const spritePlayer = new SpritePlayer(petSprite);
+const preloadPetAnimations = (pet: Pet) => {
+  const assets = Object.values(pet.skin.animations).filter((asset): asset is PetAnimationAsset => Boolean(asset));
+  void spritePlayer.preload(assets);
+};
 const petContextMenu = byId<HTMLElement>("pet-context-menu");
 let collapsedPositionBeforePanel: { x: number; y: number } | undefined;
 const petDragThreshold = 6;
@@ -608,6 +612,7 @@ byId<HTMLSelectElement>("pet-select").addEventListener("change", (event) => {
   state.petId = (event.target as HTMLSelectElement).value;
   saveState();
   render();
+  preloadPetAnimations(selectedPet());
   setPetAction("happy", 1000);
   showMessage(t("messages.petChanged", { pet: t(selectedPet().nameKey) }));
 });
@@ -689,7 +694,7 @@ byId("todo-list").addEventListener("click", (event) => {
 
 const bootstrap = async () => {
   render();
-  void spritePlayer.preload(pets.flatMap((pet) => Object.values(pet.skin.animations).filter((asset): asset is PetAnimationAsset => Boolean(asset))));
+  preloadPetAnimations(selectedPet());
   await appWindow.setTitle(t("app.title"));
   await appWindow.setAlwaysOnTop(state.alwaysOnTop);
   await appWindow.setSize(collapsedWindowSize());
