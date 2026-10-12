@@ -14,16 +14,17 @@ test("collapsed pet window is transparent and has no native shadow frame", () =>
   assert.equal(window.backgroundColor, "#00000000");
 });
 
-test("pet context menu uses a native cursor-positioned menu without resizing the pet window", () => {
+test("pet context menu keeps the custom styled surface", () => {
   const main = read("src/main.ts");
   const rust = read("src-tauri/src/lib.rs");
   const styles = read("src/styles.css");
 
-  assert.match(main, /invoke\("show_pet_menu"\)/);
-  assert.doesNotMatch(main, /id="pet-context-menu"/);
-  assert.match(rust, /fn show_pet_menu/);
-  assert.match(rust, /window\.popup_menu\(&menu\)/);
-  assert.match(rust, /window\.emit\("open-settings"/);
+  assert.match(main, /id="pet-context-menu"/);
+  assert.match(main, /id="context-settings-button"/);
+  assert.match(main, /id="quit-button"/);
+  assert.doesNotMatch(main, /invoke\("show_pet_menu"\)/);
+  assert.doesNotMatch(rust, /fn show_pet_menu/);
+  assert.match(styles, /\.pet-context-menu \{/);
   assert.match(styles, /\.settings-trigger,[\s\S]*\.quick-actions \{ opacity: 0; pointer-events: none;/);
 });
 
@@ -34,13 +35,32 @@ test("native tray has an explicit icon, left-click restore, and a registered qui
   assert.match(rust, /include_bytes!\("\.\.\/icons\/32x32\.png"\)/);
   assert.match(rust, /Image::from_app_icon_resource\(32\)/);
   assert.match(rust, /\.icon\(tray_icon\)/);
+  assert.match(rust, /TrayIconBuilder::with_id\("desktop-pet-tray"\)/);
+  assert.match(rust, /app\.manage\(tray\)/);
   assert.doesNotMatch(rust, /system tray is unavailable/);
   assert.match(rust, /\.show_menu_on_left_click\(false\)/);
   assert.match(rust, /TrayIconEvent::Click/);
   assert.match(rust, /MouseButton::Left/);
   assert.match(rust, /fn quit_app/);
-  assert.match(rust, /generate_handler!\[quit_app, show_pet_menu\]/);
+  assert.match(rust, /generate_handler!\[quit_app\]/);
   assert.match(cargo, /"image-png"/);
+});
+
+test("settings expansion preserves the collapsed pet position and restores it on close", () => {
+  const main = read("src/main.ts");
+
+  assert.match(main, /collapsedPositionBeforePanel/);
+  assert.match(main, /anchorExpandedWindow/);
+  assert.match(main, /setPosition\(new PhysicalPosition\(collapsedPositionBeforePanel\.x/);
+  assert.doesNotMatch(main, /setSize\(open[\s\S]{0,180}restorePosition\(\)/);
+});
+
+test("pet hover and settings shadows keep enough transparent gutter to avoid rectangular clipping", () => {
+  const styles = read("src/styles.css");
+
+  assert.match(styles, /\.settings-trigger \{[^}]*top: 16px;[^}]*right: 16px;/);
+  assert.match(styles, /\.quick-actions \{[^}]*bottom: 14px;/);
+  assert.match(styles, /\.settings-panel \{[^}]*inset: 28px;/);
 });
 
 test("hydration feedback reports amount, total, target, and remaining water", () => {

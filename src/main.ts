@@ -18,7 +18,6 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import type { PetAction, PetSkinManifest } from "./pet-skin";
 import { SpritePlayer } from "./sprite-player";
@@ -193,6 +192,11 @@ document.body.innerHTML = `
         <button class="quick-button" id="feed-button" aria-label="${t("actions.feed")}" data-tooltip="${t("actions.feed")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.1 5.5a3 3 0 0 0-4.2 4.2l.7.7-.7.7a3 3 0 0 0 4.2 4.2l.8-.7 5.4 5.4a3 3 0 0 0 4.2-4.2l-.7-.7.7-.8a3 3 0 0 0-4.2-4.2l-5.4-5.4-.8.8Z"/></svg></button>
         <button class="quick-button" id="todo-button" aria-label="${t("actions.todo")}" data-tooltip="${t("actions.todo")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5h9M8.5 12h9M8.5 17.5h9"/><path d="m4 6.4.9.9 1.7-1.8M4 11.9l.9.9 1.7-1.8M4 17.4l.9.9 1.7-1.8"/></svg></button>
       </div>
+      <div class="pet-context-menu" id="pet-context-menu" role="menu" aria-label="${t("accessibility.petContextMenu")}" hidden>
+        <button id="context-settings-button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.37 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.23 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1.1-.37H2.4v-4h.09A1.7 1.7 0 0 0 4 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.4 4.23a1.7 1.7 0 0 0 1-.63 1.7 1.7 0 0 0 .37-1.1V2.4h4v.09A1.7 1.7 0 0 0 15 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 8.4c.3.28.52.62.63 1 .1.34.13.71.09 1.1h.01v3.2H20a1.7 1.7 0 0 0-.6 1.3Z"/></svg><span>${t("actions.settings")}</span></button>
+        <div class="context-divider" aria-hidden="true"></div>
+        <button class="danger-item" id="quit-button" role="menuitem" aria-label="${t("accessibility.quitApp")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9M6.2 6.2a8 8 0 1 0 11.6 0"/></svg><span>${t("actions.quit")}</span></button>
+      </div>
     </section>
     <aside class="settings-panel" id="settings-panel" aria-hidden="true">
       <header class="panel-heading">
@@ -252,6 +256,12 @@ const speechBubble = byId<HTMLElement>("speech-bubble");
 const petImage = byId<HTMLImageElement>("pet-image");
 const petSprite = byId<HTMLCanvasElement>("pet-sprite");
 const spritePlayer = new SpritePlayer(petSprite);
+const petContextMenu = byId<HTMLElement>("pet-context-menu");
+let collapsedPositionBeforePanel: { x: number; y: number } | undefined;
+
+const hidePetContextMenu = () => {
+  petContextMenu.hidden = true;
+};
 const showMessage = (message: string, duration = 3200) => {
   speechBubble.textContent = message;
   speechBubble.classList.add("visible");
@@ -282,6 +292,17 @@ const setPetAction = (action: PetAction, duration = 900) => {
 };
 
 const collapsedWindowSize = () => new LogicalSize(Math.max(140, state.petSize + 60), Math.max(158, state.petSize + 86));
+const expandedWindowSize = () => new LogicalSize(476, 736);
+
+const anchorExpandedWindow = async (position: { x: number; y: number }) => {
+  const scale = await appWindow.scaleFactor();
+  const collapsed = collapsedWindowSize();
+  const expanded = expandedWindowSize();
+  return {
+    x: Math.round(position.x + ((collapsed.width - expanded.width) * scale) / 2),
+    y: Math.round(position.y + (collapsed.height - expanded.height) * scale),
+  };
+};
 
 const clampPosition = async (position: { x: number; y: number }) => {
   const monitors = await availableMonitors();
@@ -320,11 +341,29 @@ const savePosition = async () => {
 };
 
 const setPanelOpen = async (open: boolean) => {
+  hidePetContextMenu();
+  if (open === panelOpen) return;
+  if (open) {
+    const position = await appWindow.outerPosition();
+    collapsedPositionBeforePanel = { x: position.x, y: position.y };
+  }
   panelOpen = open;
   document.documentElement.dataset.panelOpen = open ? "true" : "false";
   settingsPanel.setAttribute("aria-hidden", open ? "false" : "true");
-  await appWindow.setSize(open ? new LogicalSize(460, 720) : collapsedWindowSize());
-  if (state.position) await restorePosition();
+  if (open && collapsedPositionBeforePanel) {
+    await appWindow.setSize(expandedWindowSize());
+    const anchored = await anchorExpandedWindow(collapsedPositionBeforePanel);
+    const clamped = await clampPosition(anchored);
+    await appWindow.setPosition(new PhysicalPosition(clamped.x, clamped.y));
+    return;
+  }
+  await appWindow.setSize(collapsedWindowSize());
+  if (collapsedPositionBeforePanel) {
+    await appWindow.setPosition(new PhysicalPosition(collapsedPositionBeforePanel.x, collapsedPositionBeforePanel.y));
+    state.position = collapsedPositionBeforePanel;
+    collapsedPositionBeforePanel = undefined;
+    saveState();
+  }
 };
 
 const renderTodos = () => {
@@ -475,7 +514,9 @@ byId<HTMLSelectElement>("pet-select").innerHTML = pets.map((pet) => `<option val
 byId<HTMLInputElement>("todo-remind-input").value = toLocalDateTimeInput(new Date(Date.now() + 60 * 60_000));
 
 byId("settings-button").addEventListener("click", () => void setPanelOpen(true));
+byId("context-settings-button").addEventListener("click", () => void setPanelOpen(true));
 byId("close-settings").addEventListener("click", () => void setPanelOpen(false));
+byId("quit-button").addEventListener("click", () => void invoke("quit_app"));
 byId("drink-button").addEventListener("click", () => recordWater(250));
 byId("panel-drink-button").addEventListener("click", () => recordWater(250));
 byId("feed-button").addEventListener("click", () => {
@@ -486,8 +527,16 @@ byId("todo-button").addEventListener("click", () => void setPanelOpen(true));
 petStage.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   if (panelOpen) return;
-  void invoke("show_pet_menu");
+  petContextMenu.hidden = false;
+  const menuWidth = petContextMenu.offsetWidth;
+  const menuHeight = petContextMenu.offsetHeight;
+  petContextMenu.style.left = `${Math.max(4, Math.min(event.clientX, window.innerWidth - menuWidth - 4))}px`;
+  petContextMenu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - menuHeight - 4))}px`;
 });
+document.addEventListener("pointerdown", (event) => {
+  if (!petContextMenu.contains(event.target as Node)) hidePetContextMenu();
+});
+window.addEventListener("blur", hidePetContextMenu);
 petSurface.addEventListener("click", () => {
   if (currentAction === "drag") return;
   setPetAction("touch", 900);
@@ -594,7 +643,6 @@ byId("todo-list").addEventListener("click", (event) => {
 });
 
 const bootstrap = async () => {
-  await listen("open-settings", () => void setPanelOpen(true));
   render();
   await appWindow.setTitle(t("app.title"));
   await appWindow.setAlwaysOnTop(state.alwaysOnTop);

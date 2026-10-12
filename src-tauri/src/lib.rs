@@ -1,8 +1,7 @@
 use tauri::{
-    Emitter,
     image::Image,
     menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
 
@@ -13,16 +12,7 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-#[tauri::command]
-fn show_pet_menu(app: tauri::AppHandle, window: tauri::WebviewWindow) -> tauri::Result<()> {
-    let tray_locale = locale::load();
-    let settings = MenuItem::with_id(&app, "pet-settings", &tray_locale.settings, true, None::<&str>)?;
-    let quit = MenuItem::with_id(&app, "quit", &tray_locale.quit, true, None::<&str>)?;
-    let menu = Menu::with_items(&app, &[&settings, &quit])?;
-    window.popup_menu(&menu)
-}
-
-fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+fn setup_tray(app: &tauri::App) -> tauri::Result<TrayIcon> {
     let tray_locale = locale::load();
     let show = MenuItem::with_id(app, "show", &tray_locale.show, true, None::<&str>)?;
     let hide = MenuItem::with_id(app, "hide", &tray_locale.hide, true, None::<&str>)?;
@@ -33,7 +23,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let tray_icon = Image::from_app_icon_resource(32)?;
     #[cfg(not(target_os = "windows"))]
     let tray_icon = Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
-    TrayIconBuilder::new()
+    let tray = TrayIconBuilder::with_id("desktop-pet-tray")
         .icon(tray_icon)
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -61,19 +51,14 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                     "hide" => {
                         let _ = window.hide();
                     }
-                    "pet-settings" => {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        let _ = window.emit("open-settings", ());
-                    }
                     "quit" => app.exit(0),
                     _ => {}
                 }
             }
         })
         .build(app)?;
-
-    Ok(())
+    tray.set_visible(true)?;
+    Ok(tray)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -86,14 +71,15 @@ pub fn run() {
     }
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![quit_app, show_pet_menu])
+        .invoke_handler(tauri::generate_handler![quit_app])
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
         ))
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
-            setup_tray(app)?;
+            let tray = setup_tray(app)?;
+            app.manage(tray);
             Ok(())
         })
         .on_window_event(|window, event| {

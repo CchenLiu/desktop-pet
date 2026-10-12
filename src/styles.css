@@ -17,8 +17,8 @@
   --danger: #a34d47;
   --pet-accent: #8a756a;
   --pet-size: 72px;
-  --panel-shadow: 0 14px 30px rgba(74, 48, 34, 0.2), 0 4px 12px rgba(74, 48, 34, 0.09);
-  --control-shadow: 0 9px 24px rgba(67, 44, 31, 0.16);
+  --panel-shadow: 0 10px 22px rgba(74, 48, 34, 0.18), 0 3px 9px rgba(74, 48, 34, 0.08);
+  --control-shadow: 0 6px 14px rgba(67, 44, 31, 0.15);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,8 +37,8 @@
     --accent-deep: #edb08a;
     --accent-soft: rgba(210, 145, 105, 0.14);
     --danger: #de827a;
-    --panel-shadow: 0 16px 34px rgba(0, 0, 0, 0.42), 0 4px 14px rgba(0, 0, 0, 0.25);
-    --control-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+    --panel-shadow: 0 12px 24px rgba(0, 0, 0, 0.4), 0 3px 10px rgba(0, 0, 0, 0.24);
+    --control-shadow: 0 7px 15px rgba(0, 0, 0, 0.32);
   }
 }
 
@@ -72,14 +72,14 @@ svg { display: block; width: 1em; height: 1em; fill: none; stroke: currentColor;
 .pet-stage:hover .quick-actions,
 .settings-trigger:focus-visible,
 .quick-actions:focus-within { opacity: 1; pointer-events: auto; }
-.settings-trigger { position: absolute; z-index: 8; top: 7px; right: 7px; display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(255,255,255,.58); border-radius: 11px; background: rgba(252, 249, 245, .84); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.72); color: #6d5d55; transform: translateY(4px) scale(.94); backdrop-filter: blur(14px) saturate(1.15); }
+.settings-trigger { position: absolute; z-index: 8; top: 16px; right: 16px; display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(255,255,255,.58); border-radius: 11px; background: rgba(252, 249, 245, .84); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.72); color: #6d5d55; transform: translateY(4px) scale(.94); backdrop-filter: blur(14px) saturate(1.15); }
 .pet-stage:hover .settings-trigger,
 .settings-trigger:focus-visible { transform: translateY(0) scale(1); }
 .settings-trigger svg { width: 15px; height: 15px; }
 .settings-trigger:hover { color: var(--accent-deep); background: rgba(255, 252, 248, .96); }
 .settings-trigger:active { transform: translateY(1px) scale(.96); }
 
-.quick-actions { position: absolute; z-index: 7; bottom: 3px; left: 50%; display: flex; gap: 5px; padding: 4px; border: 1px solid rgba(255,255,255,.52); border-radius: 13px; background: rgba(249, 245, 240, .76); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.68); transform: translate(-50%, 7px) scale(.96); backdrop-filter: blur(16px) saturate(1.2); }
+.quick-actions { position: absolute; z-index: 7; bottom: 14px; left: 50%; display: flex; gap: 5px; padding: 4px; border: 1px solid rgba(255,255,255,.52); border-radius: 13px; background: rgba(249, 245, 240, .76); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.68); transform: translate(-50%, 7px) scale(.96); backdrop-filter: blur(16px) saturate(1.2); }
 .pet-stage:hover .quick-actions,
 .quick-actions:focus-within { transform: translate(-50%, 0) scale(1); }
 .quick-button { position: relative; display: grid; width: 26px; height: 26px; place-items: center; border-radius: 9px; background: transparent; color: #6b5b53; transition: color .16s ease, background .16s ease, transform .12s ease; }
@@ -91,8 +91,17 @@ svg { display: block; width: 1em; height: 1em; fill: none; stroke: currentColor;
 .speech-bubble { position: absolute; z-index: 9; top: 3px; left: 50%; width: max-content; max-width: calc(100% - 22px); padding: 9px 11px; border: 1px solid rgba(255,255,255,.64); border-radius: 13px 13px 13px 4px; background: rgba(252,249,245,.96); box-shadow: 0 10px 26px rgba(61,41,30,.16); color: #4f433d; font-size: 11px; font-weight: 600; line-height: 1.45; opacity: 0; pointer-events: none; white-space: pre-line; transform: translate(-50%, 6px) scale(.96); transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1); backdrop-filter: blur(14px); }
 .speech-bubble.visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
 
+.pet-context-menu { position: absolute; z-index: 30; min-width: 132px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--paper); box-shadow: 0 12px 28px rgba(45,31,24,.22); color: var(--ink-soft); backdrop-filter: blur(20px) saturate(1.15); }
+.pet-context-menu button { display: flex; width: 100%; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 9px; background: transparent; font-size: 11px; font-weight: 600; white-space: nowrap; transition: background .15s ease, color .15s ease; }
+.pet-context-menu button svg { width: 15px; height: 15px; }
+.pet-context-menu button:hover,
+.pet-context-menu button:focus-visible { background: var(--accent-soft); color: var(--accent-deep); outline: none; }
+.pet-context-menu .danger-item:hover,
+.pet-context-menu .danger-item:focus-visible { background: color-mix(in srgb, var(--danger) 11%, transparent); color: var(--danger); }
+.context-divider { height: 1px; margin: 4px 7px; background: var(--line); }
+
 /* Expanded settings panel */
-.settings-panel { position: absolute; inset: 22px; z-index: 20; display: none; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.58); border-radius: 28px; background: radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--pet-accent) 14%, transparent), transparent 34%), linear-gradient(155deg, var(--surface-strong), transparent 34%), var(--paper); box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255,255,255,.72); backdrop-filter: blur(26px) saturate(1.1); }
+.settings-panel { position: absolute; inset: 28px; z-index: 20; display: none; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.58); border-radius: 28px; background: radial-gradient(circle at 88% 0%, color-mix(in srgb, var(--pet-accent) 14%, transparent), transparent 34%), linear-gradient(155deg, var(--surface-strong), transparent 34%), var(--paper); box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255,255,255,.72); backdrop-filter: blur(26px) saturate(1.1); }
 .settings-panel::before { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background-image: radial-gradient(rgba(72,51,41,.055) .55px, transparent .55px); background-size: 4px 4px; content: ""; opacity: .32; pointer-events: none; }
 html[data-panel-open="true"] .settings-panel { display: flex; animation: panel-in .26s cubic-bezier(.2,.8,.2,1); }
 html[data-panel-open="true"] .pet-stage { display: none; }
