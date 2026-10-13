@@ -83,6 +83,7 @@ const enUS = {
     minute: "Minute",
     confirmReminder: "Confirm reminder time",
     cancelReminder: "Cancel this change",
+    confirmTimeHint: "Double-click after choosing a time to confirm",
     noReminder: "No reminder",
     delete: "Delete Todo",
     priority: "Priority",

@@ -140,6 +140,11 @@ test("todo reminder requires explicit confirmation and can be cancelled", () => 
   assert.match(picker, /data-calendar-day/);
   assert.match(picker, /id="reminder-time" type="time"/);
   assert.match(picker, /emitTo\("todo", "reminder-picker-confirm"/);
+  assert.match(picker, /const confirmPicker = \(\) =>/);
+  assert.match(picker, /timeInput\.addEventListener\("change", \(\) => timeInput\.blur\(\)\)/);
+  assert.match(picker, /timeInput\.addEventListener\("dblclick",[\s\S]*?confirmPicker\(\)/);
+  assert.match(picker, /timeInput\.addEventListener\("keydown",[\s\S]*?event\.key !== "Enter"[\s\S]*?confirmPicker\(\)/);
+  assert.match(picker, /byId\("reminder-confirm"\)\.addEventListener\("click", confirmPicker\)/);
   assert.match(picker, /event\.key !== "Escape"/);
   const headerStart = picker.indexOf('<header class="picker-header"');
   const headerEnd = picker.indexOf("</header>", headerStart);
@@ -166,6 +171,8 @@ test("todo reminder requires explicit confirmation and can be cancelled", () => 
   assert.match(zhCN, /cancelReminder: "取消本次设置"/);
   assert.match(enUS, /confirmReminder: "Confirm reminder time"/);
   assert.match(enUS, /cancelReminder: "Cancel this change"/);
+  assert.match(zhCN, /confirmTimeHint: "选择时间后双击即可确认"/);
+  assert.match(enUS, /confirmTimeHint: "Double-click after choosing a time to confirm"/);
 });
 
 test("always-on-top preference stays synchronized across pet, todo, and reminder windows", () => {

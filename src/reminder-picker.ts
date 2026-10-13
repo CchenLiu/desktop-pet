@@ -35,7 +35,7 @@ document.body.innerHTML = `
     <div id="calendar-grid" class="calendar-grid"></div>
     <label class="native-time">
       <span>${t("todo.reminderDateTime")}</span>
-      <input id="reminder-time" type="time" step="60" />
+      <input id="reminder-time" type="time" step="60" title="${t("todo.confirmTimeHint")}" />
     </label>
   </main>
 `;
@@ -82,6 +82,13 @@ const cancelPicker = () => {
   void pickerWindow.hide();
 };
 
+const confirmPicker = () => {
+  void emitTo("todo", "reminder-picker-confirm", reminderValue());
+  void pickerWindow.hide();
+};
+
+const timeInput = byId<HTMLInputElement>("reminder-time");
+
 byId("calendar-previous").addEventListener("click", () => {
   calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
   renderCalendar();
@@ -99,9 +106,16 @@ byId("calendar-grid").addEventListener("click", (event) => {
   renderCalendar();
 });
 byId("reminder-cancel").addEventListener("click", cancelPicker);
-byId("reminder-confirm").addEventListener("click", () => {
-  void emitTo("todo", "reminder-picker-confirm", reminderValue());
-  void pickerWindow.hide();
+byId("reminder-confirm").addEventListener("click", confirmPicker);
+timeInput.addEventListener("change", () => timeInput.blur());
+timeInput.addEventListener("dblclick", (event) => {
+  event.preventDefault();
+  confirmPicker();
+});
+timeInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  confirmPicker();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;

@@ -83,6 +83,7 @@ const zhCN = {
     minute: "分",
     confirmReminder: "确认提醒时间",
     cancelReminder: "取消本次设置",
+    confirmTimeHint: "选择时间后双击即可确认",
     noReminder: "无提醒",
     delete: "删除待办",
     priority: "重要程度",
