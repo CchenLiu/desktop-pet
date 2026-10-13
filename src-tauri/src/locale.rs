@@ -18,4 +18,3 @@ pub fn load() -> TrayLocale {
 
     serde_json::from_str(source).expect("invalid tray locale file")
 }
-

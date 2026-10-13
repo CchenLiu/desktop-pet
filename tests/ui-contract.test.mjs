@@ -201,3 +201,14 @@ test("runtime uses a writable per-user data directory with an environment overri
   assert.match(rust, /create_dir_all\(&data_dir\)/);
   assert.match(rust, /app_directories_override/);
 });
+
+test("startup probes writable data fallbacks and tray setup cannot abort the app", () => {
+  const rust = read("src-tauri/src/lib.rs");
+
+  assert.match(rust, /current_exe\(\)/);
+  assert.match(rust, /\.desktop-pet-data/);
+  assert.match(rust, /OpenOptions::new\(\)/);
+  assert.match(rust, /if let Err\(error\) = setup_tray\(app\)/);
+  assert.doesNotMatch(rust, /setup_tray\(app\)\?;/);
+  assert.doesNotMatch(rust, /tray\.set_visible\(true\)\?/);
+});
