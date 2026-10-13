@@ -33,11 +33,14 @@ test("native tray has an explicit icon, left-click restore, and a registered qui
   const config = JSON.parse(read("src-tauri/tauri.conf.json"));
   const cargo = read("src-tauri/Cargo.toml");
 
-  assert.equal(config.app.trayIcon.id, "desktop-pet-tray");
-  assert.equal(config.app.trayIcon.iconPath, "icons/32x32.png");
-  assert.equal(config.app.trayIcon.showMenuOnLeftClick, false);
-  assert.match(rust, /tray_by_id\("desktop-pet-tray"\)/);
-  assert.doesNotMatch(rust, /TrayIconBuilder/);
+  assert.equal(config.app.trayIcon, undefined);
+  assert.match(rust, /TrayIconBuilder::with_id\("desktop-pet-tray"\)/);
+  assert.match(rust, /Image::from_bytes\(include_bytes!\("\.\.\/icons\/32x32\.png"\)\)/);
+  assert.match(rust, /\.icon\(icon\)/);
+  assert.match(rust, /\.menu\(&menu\)/);
+  assert.match(rust, /\.show_menu_on_left_click\(false\)/);
+  assert.match(rust, /RunEvent::Ready/);
+  assert.match(rust, /setup_tray\(app_handle\)/);
   assert.doesNotMatch(rust, /app\.manage\(tray\)/);
   assert.doesNotMatch(rust, /system tray is unavailable/);
   assert.match(rust, /TrayIconEvent::Click/);
@@ -47,6 +50,34 @@ test("native tray has an explicit icon, left-click restore, and a registered qui
   assert.doesNotMatch(rust, /RunEvent::ExitRequested/);
   assert.doesNotMatch(rust, /api\.prevent_exit\(\)/);
   assert.match(cargo, /"image-png"/);
+});
+
+test("todo window is compact, frameless, transparent, and has an in-app close control", () => {
+  const config = JSON.parse(read("src-tauri/tauri.conf.json"));
+  const todoWindow = config.app.windows.find(({ label }) => label === "todo");
+  const todo = read("src/todo.ts");
+  const styles = read("src/todo.css");
+
+  assert.equal(todoWindow.width, 476);
+  assert.ok(todoWindow.height <= 660);
+  assert.equal(todoWindow.resizable, false);
+  assert.equal(todoWindow.decorations, false);
+  assert.equal(todoWindow.transparent, true);
+  assert.equal(todoWindow.shadow, false);
+  assert.equal(todoWindow.backgroundColor, "#00000000");
+  assert.match(todo, /data-tauri-drag-region/);
+  assert.match(todo, /id="close-todo"/);
+  assert.match(todo, /todoWindow\.hide\(\)/);
+  assert.match(styles, /\.todo-window\s*\{/);
+});
+
+test("settings supporting text is at least eleven pixels", () => {
+  const styles = read("src/styles.css");
+
+  for (const selector of [".eyebrow", ".section-kicker", ".panel-tip", ".switch-row small", ".panel-footer"]) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(styles, new RegExp(`${escaped} \\{[^}]*font(?:-size|:)[^;}]*11px`, "s"));
+  }
 });
 
 test("settings expansion preserves the collapsed pet position and restores it on close", () => {
@@ -127,6 +158,18 @@ test("pet sprite sheets use isolated 4 by 4 cells and higher frame rates", () =>
   }
 });
 
+test("problem animation sets keep stable frame maps and clean high-quality Maine Coon edges", () => {
+  const main = read("src/main.ts");
+  const player = read("src/sprite-player.ts");
+
+  assert.match(main, /id === "alaskan" && action === "touch"[\s\S]*\[0, 1, 2, 3, 2, 1, 0/);
+  assert.match(main, /id === "shepherd" && action === "feed"[\s\S]*5, 5, 5, 5, 5/);
+  assert.match(main, /id === "maine-coon" \? "green-fringe"/);
+  assert.match(player, /asset\.frameMap\?\.\[frame\] \?\? frame/);
+  assert.match(player, /cleanGreenFringe/);
+  assert.match(player, /imageSmoothingQuality = "high"/);
+});
+
 test("pet interaction separates a short touch from threshold-based dragging", () => {
   const main = read("src/main.ts");
   const player = read("src/sprite-player.ts");
@@ -151,7 +194,7 @@ test("todo quick action opens a dedicated native todo window", () => {
 
   assert.equal(todoWindow.url, "todo.html");
   assert.equal(todoWindow.visible, false);
-  assert.equal(todoWindow.resizable, true);
+  assert.equal(todoWindow.resizable, false);
   assert.match(main, /invoke\("show_todo_window"\)/);
   assert.doesNotMatch(main, /id="todo-section"/);
   assert.match(rust, /fn show_todo_window/);
@@ -182,7 +225,8 @@ test("dedicated todo list supports add, complete, delete, filters, and priority 
 test("tray uses the bundled PNG directly instead of the Windows executable resource", () => {
   const rust = read("src-tauri/src/lib.rs");
   const config = JSON.parse(read("src-tauri/tauri.conf.json"));
-  assert.equal(config.app.trayIcon.iconPath, "icons/32x32.png");
+  assert.equal(config.app.trayIcon, undefined);
+  assert.match(rust, /include_bytes!\("\.\.\/icons\/32x32\.png"\)/);
   assert.doesNotMatch(rust, /from_app_icon_resource/);
 });
 
@@ -202,14 +246,13 @@ test("runtime uses a writable per-user data directory with an environment overri
   assert.match(rust, /app_directories_override/);
 });
 
-test("startup probes writable data fallbacks and tray setup cannot abort the app", () => {
+test("startup probes writable data fallbacks and tray creation errors cannot abort the app", () => {
   const rust = read("src-tauri/src/lib.rs");
 
   assert.match(rust, /current_exe\(\)/);
   assert.match(rust, /\.desktop-pet-data/);
   assert.match(rust, /OpenOptions::new\(\)/);
-  assert.match(rust, /if let Err\(error\) = tray\.set_visible\(true\)/);
-  assert.match(rust, /if let Err\(error\) = tray\.set_menu\(Some\(menu\)\)/);
+  assert.match(rust, /if let Err\(error\) = result/);
   assert.doesNotMatch(rust, /setup_tray\(app\)\?;/);
-  assert.doesNotMatch(rust, /tray\.set_menu\(Some\(menu\)\)\?/);
+  assert.doesNotMatch(rust, /setup_tray\(app\)\.expect/);
 });

@@ -8,6 +8,7 @@ const zhCN = {
   accessibility: {
     openSettings: "打开设置",
     closeSettings: "关闭设置",
+    closeTodo: "关闭待办",
     interactWithPet: "和桌宠互动",
     quitApp: "退出桌宠",
     quickActions: "快捷互动",

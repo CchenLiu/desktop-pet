@@ -7,6 +7,8 @@ export type PetAnimationAsset = {
   rows: number;
   fps: number;
   loop: boolean;
+  frameMap?: number[];
+  edgeCleanup?: "green-fringe";
 };
 
 export type PetSkinManifest = {

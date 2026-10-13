@@ -2,7 +2,6 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct TrayLocale {
-    pub tooltip: String,
     pub show: String,
     pub hide: String,
     pub quit: String,

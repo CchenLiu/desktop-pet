@@ -76,6 +76,12 @@ const animationAsset = (id: string, action: string, fps: number, loop: boolean):
   rows: 4,
   fps,
   loop,
+  frameMap: id === "alaskan" && action === "touch"
+    ? [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 0]
+    : id === "shepherd" && action === "feed"
+      ? [0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 6, 7, 8, 12, 13, 14]
+      : undefined,
+  edgeCleanup: id === "maine-coon" ? "green-fringe" : undefined,
 });
 const animatedSkin = (id: string) => skin(id, {
   idle: animationAsset(id, "idle", 10, true),

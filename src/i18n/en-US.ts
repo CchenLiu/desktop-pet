@@ -8,6 +8,7 @@ const enUS = {
   accessibility: {
     openSettings: "Open settings",
     closeSettings: "Close settings",
+    closeTodo: "Close Todo",
     interactWithPet: "Interact with desktop pet",
     quitApp: "Quit desktop pet",
     quickActions: "Quick interactions",

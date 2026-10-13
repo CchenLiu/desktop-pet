@@ -16,6 +16,7 @@ type TodoFilter = "all" | "active" | "done";
 
 let todos = loadTodos();
 let activeFilter: TodoFilter = "all";
+const todoWindow = getCurrentWindow();
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({
   "&": "&amp;",
@@ -30,7 +31,14 @@ const formatReminder = (value: string) => value
   : t("todo.noReminder");
 
 document.body.innerHTML = `
-  <main class="todo-app">
+  <main class="todo-window">
+    <header class="todo-titlebar" data-tauri-drag-region>
+      <span data-tauri-drag-region>${t("todo.windowTitle")}</span>
+      <button id="close-todo" class="todo-window-close" type="button" aria-label="${t("accessibility.closeTodo")}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+      </button>
+    </header>
+    <div class="todo-app">
     <header class="todo-header">
       <div>
         <span class="todo-kicker">${t("todo.eyebrow")}</span>
@@ -71,6 +79,7 @@ document.body.innerHTML = `
       <button type="button" data-filter="done">${t("todo.filterDone")}</button>
     </nav>
     <section class="todo-list" id="todo-list" aria-live="polite"></section>
+    </div>
   </main>
 `;
 
@@ -132,6 +141,7 @@ const addTodo = () => {
 };
 
 byId("add-todo").addEventListener("click", addTodo);
+byId("close-todo").addEventListener("click", () => void todoWindow.hide());
 byId<HTMLInputElement>("todo-title").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addTodo();
 });
@@ -158,5 +168,5 @@ document.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((button) =
   });
 });
 
-void getCurrentWindow().setTitle(t("todo.windowTitle"));
+void todoWindow.setTitle(t("todo.windowTitle"));
 render();

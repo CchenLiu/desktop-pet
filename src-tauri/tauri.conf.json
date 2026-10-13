@@ -32,24 +32,19 @@
         "label": "todo",
         "title": "Todo List",
         "url": "todo.html",
-        "width": 620,
-        "height": 720,
-        "minWidth": 440,
+        "width": 476,
+        "height": 640,
+        "minWidth": 420,
         "minHeight": 520,
         "center": true,
-        "resizable": true,
-        "decorations": true,
-        "transparent": false,
-        "backgroundColor": "#F4EEE4",
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "backgroundColor": "#00000000",
+        "shadow": false,
         "visible": false
       }
     ],
-    "trayIcon": {
-      "id": "desktop-pet-tray",
-      "iconPath": "icons/32x32.png",
-      "iconAsTemplate": false,
-      "showMenuOnLeftClick": false
-    },
     "security": {
       "csp": null
     }
