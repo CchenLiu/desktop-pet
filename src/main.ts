@@ -516,6 +516,12 @@ document.addEventListener("pointerdown", (event) => {
   if (!petContextMenu.contains(event.target as Node)) hidePetContextMenu();
 });
 window.addEventListener("blur", hidePetContextMenu);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && panelOpen) {
+    event.preventDefault();
+    void setPanelOpen(false);
+  }
+});
 const triggerPetTouch = () => {
   setPetAction("touch", 900);
   showMessage(t("messages.petInteraction"));

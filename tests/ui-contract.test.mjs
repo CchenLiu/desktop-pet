@@ -92,6 +92,20 @@ test("todo window is compact, frameless, transparent, and has an in-app close co
   assert.match(styles, /\.composer-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) 34px 34px auto;/);
 });
 
+test("escape closes settings and todo while todo close uses an allowed hide command", () => {
+  const capabilities = JSON.parse(read("src-tauri/capabilities/default.json"));
+  const main = read("src/main.ts");
+  const todo = read("src/todo.ts");
+
+  assert.ok(capabilities.permissions.includes("core:window:allow-hide"));
+  assert.match(todo, /const closeTodoWindow = \(\) =>/);
+  assert.match(todo, /byId\("close-todo"\)\.addEventListener\("click", closeTodoWindow\)/);
+  assert.match(todo, /event\.key !== "Escape"/);
+  assert.match(todo, /setReminderPopoverOpen\(false\)[\s\S]*?closeTodoWindow\(\)/);
+  assert.match(main, /event\.key === "Escape" && panelOpen/);
+  assert.match(main, /setPanelOpen\(false\)/);
+});
+
 test("todo reminder requires explicit confirmation and can be cancelled", () => {
   const todo = read("src/todo.ts");
   const styles = read("src/todo.css");

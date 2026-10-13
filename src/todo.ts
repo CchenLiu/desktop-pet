@@ -193,6 +193,12 @@ const setReminderPopoverOpen = (open: boolean) => {
   resizeTodoWindow();
 };
 
+const closeTodoWindow = () => {
+  restoreReminderDraft(confirmedReminder);
+  setReminderPopoverOpen(false);
+  void todoWindow.hide();
+};
+
 const render = () => {
   const visibleTodos = todos.filter((todo) => activeFilter === "all" || (activeFilter === "done" ? todo.done : !todo.done));
   const results = byId<HTMLElement>("todo-results");
@@ -249,7 +255,7 @@ const addTodo = () => {
 };
 
 byId("add-todo").addEventListener("click", addTodo);
-byId("close-todo").addEventListener("click", () => void todoWindow.hide());
+byId("close-todo").addEventListener("click", closeTodoWindow);
 byId("reminder-button").addEventListener("click", () => {
   restoreReminderDraft(confirmedReminder);
   setReminderPopoverOpen(true);
@@ -294,6 +300,18 @@ void listen<string>("todo-window-open", ({ payload }) => {
 });
 byId<HTMLInputElement>("todo-title").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addTodo();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  event.preventDefault();
+  const popover = byId<HTMLElement>("reminder-popover");
+  if (!popover.hidden) {
+    restoreReminderDraft(confirmedReminder);
+    setReminderPopoverOpen(false);
+    byId<HTMLButtonElement>("reminder-button").focus();
+    return;
+  }
+  closeTodoWindow();
 });
 byId("todo-list").addEventListener("change", (event) => {
   const id = (event.target as HTMLInputElement).dataset.toggle;
