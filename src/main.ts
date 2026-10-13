@@ -21,6 +21,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import type { PetAction, PetAnimationAsset, PetSkinManifest } from "./pet-skin";
+import { isTodoReminderDue } from "./reminder-engine";
 import { SpritePlayer } from "./sprite-player";
 import { normalizeTodo, todoEventName, type Todo } from "./todo-store";
 
@@ -442,21 +443,21 @@ const recordWater = (amount: number) => {
   }), 5200);
 };
 
-const checkReminders = () => {
+const runReminderChecks = (now = Date.now()) => {
   resetWaterForNewDay();
-  const now = new Date();
+  const nowDate = new Date(now);
   const target = targetAmount();
   let hydrationDue = false;
   if (state.waterDone < target && state.reminderMode === "interval") {
     const intervalMinutes = Math.max(15, Number(state.reminderValue) || 60);
-    hydrationDue = Date.now() - state.lastHydrationReminderAt >= intervalMinutes * 60_000;
+    hydrationDue = now - state.lastHydrationReminderAt >= intervalMinutes * 60_000;
   } else if (state.waterDone < target) {
-    const minuteKey = `${localDateKey(now)}-${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const minuteKey = `${localDateKey(nowDate)}-${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`;
     hydrationDue = state.reminderValue === minuteKey.slice(-5) && state.lastHydrationReminderKey !== minuteKey;
     if (hydrationDue) state.lastHydrationReminderKey = minuteKey;
   }
   if (hydrationDue) {
-    state.lastHydrationReminderAt = Date.now();
+    state.lastHydrationReminderAt = now;
     setPetAction("remind", 1800);
     showMessage(t("messages.reminder"), 5000);
     void notify(t("actions.drink"), t("messages.notificationBody", { done: state.waterDone, target }));
@@ -464,9 +465,10 @@ const checkReminders = () => {
 
   let todoChanged = false;
   for (const todo of state.todos) {
-    if (!todo.done && !todo.notified && todo.remindAt && new Date(todo.remindAt).getTime() <= Date.now()) {
+    if (isTodoReminderDue(todo, now)) {
       todo.notified = true;
       todoChanged = true;
+      void appWindow.show();
       setPetAction("remind", 1800);
       showMessage(t("messages.todoReminder", { todo: todo.title }), 5000);
       void notify(t("todo.notificationTitle"), todo.title);
@@ -618,6 +620,7 @@ const bootstrap = async () => {
   stopTodoSync = await listen<Todo[]>(todoEventName, ({ payload }) => {
     state.todos = payload.map(normalizeTodo);
     saveState();
+    runReminderChecks();
   });
   await appWindow.setTitle(t("app.title"));
   await appWindow.setAlwaysOnTop(state.alwaysOnTop);
@@ -630,8 +633,8 @@ const bootstrap = async () => {
   } catch {
     // The plugin can be unavailable in a browser-only preview.
   }
-  checkReminders();
-  reminderTimer = window.setInterval(checkReminders, 15_000);
+  runReminderChecks();
+  reminderTimer = window.setInterval(runReminderChecks, 1_000);
 };
 
 void bootstrap();

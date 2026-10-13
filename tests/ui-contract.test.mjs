@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import ts from "typescript";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+
+const importTypeScriptModule = async (path) => {
+  const output = ts.transpileModule(read(path), {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
+};
 
 test("collapsed pet window is transparent and has no native shadow frame", () => {
   const config = JSON.parse(read("src-tauri/tauri.conf.json"));
@@ -92,15 +100,47 @@ test("todo reminder requires explicit confirmation and can be cancelled", () => 
 
   assert.match(todo, /id="reminder-confirm"/);
   assert.match(todo, /id="reminder-cancel"/);
+  assert.match(todo, /id="reminder-popover"/);
+  assert.match(todo, /class="calendar-grid"/);
+  assert.match(todo, /data-calendar-day/);
+  assert.match(todo, /id="reminder-hour"/);
+  assert.match(todo, /id="reminder-minute"/);
+  assert.doesNotMatch(todo, /datetime-local/);
+  assert.doesNotMatch(todo, /showPicker/);
   assert.match(todo, /let confirmedReminder = ""/);
-  assert.match(todo, /confirmedReminder = input\.value/);
-  assert.match(todo, /input\.value = confirmedReminder/);
+  assert.match(todo, /confirmedReminder = buildReminderValue\(\)/);
+  assert.match(todo, /restoreReminderDraft\(confirmedReminder\)/);
   assert.match(todo, /remindAt: confirmedReminder/);
-  assert.match(styles, /\.reminder-actions/);
+  assert.match(styles, /\.reminder-popover/);
+  assert.match(styles, /\.calendar-grid/);
   assert.match(zhCN, /confirmReminder: "确认提醒时间"/);
   assert.match(zhCN, /cancelReminder: "取消本次设置"/);
   assert.match(enUS, /confirmReminder: "Confirm reminder time"/);
   assert.match(enUS, /cancelReminder: "Cancel this change"/);
+});
+
+test("due todo reminders are checked immediately after sync and every second", () => {
+  const main = read("src/main.ts");
+  const engine = read("src/reminder-engine.ts");
+
+  assert.match(main, /const runReminderChecks = \(now = Date\.now\(\)\)/);
+  assert.match(main, /isTodoReminderDue\(todo, now\)/);
+  assert.match(engine, /new Date\(todo\.remindAt\)\.getTime\(\)/);
+  assert.match(engine, /dueAt <= now/);
+  assert.match(main, /showMessage\(t\("messages\.todoReminder"/);
+  assert.match(main, /setInterval\(runReminderChecks, 1_000\)/);
+  assert.match(main, /listen<Todo\[]>\(todoEventName,[\s\S]*?runReminderChecks\(\)/);
+});
+
+test("todo due-time predicate handles due, future, completed, and notified tasks", async () => {
+  const { isTodoReminderDue } = await importTypeScriptModule("src/reminder-engine.ts");
+  const now = Date.parse("2026-10-13T10:30:00");
+  const todo = { title: "test", done: false, notified: false, remindAt: "2026-10-13T10:30" };
+
+  assert.equal(isTodoReminderDue(todo, now), true);
+  assert.equal(isTodoReminderDue({ ...todo, remindAt: "2026-10-13T10:31" }, now), false);
+  assert.equal(isTodoReminderDue({ ...todo, done: true }, now), false);
+  assert.equal(isTodoReminderDue({ ...todo, notified: true }, now), false);
 });
 
 test("todo window opens beside the pet and stays inside the current monitor work area", () => {
