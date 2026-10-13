@@ -58,8 +58,8 @@ test("todo window is compact, frameless, transparent, and has an in-app close co
   const todo = read("src/todo.ts");
   const styles = read("src/todo.css");
 
-  assert.ok(todoWindow.width <= 420);
-  assert.ok(todoWindow.height <= 500);
+  assert.ok(todoWindow.width >= 460);
+  assert.ok(todoWindow.height <= 420);
   assert.notEqual(todoWindow.center, true);
   assert.equal(todoWindow.resizable, false);
   assert.equal(todoWindow.decorations, false);
@@ -68,11 +68,20 @@ test("todo window is compact, frameless, transparent, and has an in-app close co
   assert.equal(todoWindow.backgroundColor, "#00000000");
   assert.match(todo, /data-tauri-drag-region/);
   assert.match(todo, /id="close-todo"/);
+  assert.doesNotMatch(todo, /class="todo-titlebar"/);
+  assert.doesNotMatch(todo, /todo\.eyebrow/);
+  assert.match(todo, /id="reminder-button"/);
+  assert.match(todo, /id="priority-button"/);
+  assert.match(todo, /id="todo-results"/);
+  assert.match(todo, /results\.hidden = todos\.length === 0/);
+  assert.match(todo, /new LogicalSize\(480, targetHeight\)/);
+  assert.doesNotMatch(todo, /todo\.empty/);
   assert.match(todo, /todoWindow\.hide\(\)/);
   assert.match(todo, /listen<string>\("todo-window-open"/);
   assert.match(styles, /\.todo-window\s*\{/);
   assert.match(styles, /@keyframes todo-slide-(?:left|right)/);
-  assert.match(styles, /body \{[^}]*padding: 24px;/);
+  assert.match(styles, /body \{[^}]*padding: 20px;/);
+  assert.match(styles, /\.composer-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) 34px 34px auto;/);
 });
 
 test("todo window opens beside the pet and stays inside the current monitor work area", () => {
