@@ -66,22 +66,15 @@ svg { display: block; width: 1em; height: 1em; fill: none; stroke: currentColor;
 .pet-surface:focus-visible::after { position: absolute; inset: 1px; border: 1.5px solid color-mix(in srgb, var(--pet-accent) 70%, white); border-radius: 42%; content: ""; box-shadow: 0 0 0 4px color-mix(in srgb, var(--pet-accent) 13%, transparent); }
 .action-prop { position: absolute; z-index: 3; right: -1px; bottom: 12%; font-size: calc(var(--pet-size) * .25); opacity: 0; transform: scale(.5); filter: drop-shadow(0 4px 5px rgba(53, 35, 25, .18)); }
 
-.settings-trigger,
-.quick-actions { opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .22s cubic-bezier(.2, .8, .2, 1); }
-.pet-stage:hover .settings-trigger,
-.pet-stage:hover .quick-actions,
-.settings-trigger:focus-visible,
-.quick-actions:focus-within { opacity: 1; pointer-events: auto; }
-.settings-trigger { position: absolute; z-index: 8; top: 16px; right: 16px; display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(255,255,255,.58); border-radius: 11px; background: rgba(252, 249, 245, .84); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.72); color: #6d5d55; transform: translateY(4px) scale(.94); backdrop-filter: blur(14px) saturate(1.15); }
-.pet-stage:hover .settings-trigger,
-.settings-trigger:focus-visible { transform: translateY(0) scale(1); }
+.pet-controls { position: absolute; z-index: 8; bottom: 14px; left: 50%; display: flex; align-items: center; gap: 6px; opacity: 0; pointer-events: none; transform: translate(-50%, 7px) scale(.96); transition: opacity .18s ease, transform .22s cubic-bezier(.2, .8, .2, 1); }
+.pet-stage:hover .pet-controls,
+.pet-controls:focus-within { opacity: 1; pointer-events: auto; transform: translate(-50%, 0) scale(1); }
+.settings-trigger { position: relative; display: grid; width: 29px; height: 29px; flex: 0 0 29px; place-items: center; border: 1px solid rgba(255,255,255,.58); border-radius: 11px; background: rgba(252, 249, 245, .84); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.72); color: #6d5d55; backdrop-filter: blur(14px) saturate(1.15); transition: color .16s ease, background .16s ease, transform .12s ease; }
 .settings-trigger svg { width: 15px; height: 15px; }
 .settings-trigger:hover { color: var(--accent-deep); background: rgba(255, 252, 248, .96); }
 .settings-trigger:active { transform: translateY(1px) scale(.96); }
 
-.quick-actions { position: absolute; z-index: 7; bottom: 14px; left: 50%; display: flex; gap: 5px; padding: 4px; border: 1px solid rgba(255,255,255,.52); border-radius: 13px; background: rgba(249, 245, 240, .76); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.68); transform: translate(-50%, 7px) scale(.96); backdrop-filter: blur(16px) saturate(1.2); }
-.pet-stage:hover .quick-actions,
-.quick-actions:focus-within { transform: translate(-50%, 0) scale(1); }
+.quick-actions { display: flex; gap: 5px; padding: 4px; border: 1px solid rgba(255,255,255,.52); border-radius: 13px; background: rgba(249, 245, 240, .76); box-shadow: var(--control-shadow), inset 0 1px 0 rgba(255,255,255,.68); backdrop-filter: blur(16px) saturate(1.2); }
 .quick-button { position: relative; display: grid; width: 26px; height: 26px; place-items: center; border-radius: 9px; background: transparent; color: #6b5b53; transition: color .16s ease, background .16s ease, transform .12s ease; }
 .quick-button svg { width: 15px; height: 15px; }
 .quick-button:hover,

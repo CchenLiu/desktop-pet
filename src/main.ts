@@ -21,7 +21,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
-import type { PetAction, PetAnimationAsset, PetSkinManifest } from "./pet-skin";
+import { petActionTimelines } from "./pet-animation-timelines";
+import { animationDurationMs, type PetAction, type PetAnimationAsset, type PetSkinManifest } from "./pet-skin";
 import { isTodoReminderDue } from "./reminder-engine";
 import { SpritePlayer } from "./sprite-player";
 import { normalizeTodo, todoEventName, type Todo } from "./todo-store";
@@ -71,18 +72,17 @@ const skin = (id: string, animations: PetSkinManifest["animations"] = {}): PetSk
   animations,
 });
 
-const animationAsset = (id: string, action: string, fps: number, loop: boolean): PetAnimationAsset => ({
+const animationAsset = (id: string, action: PetAction, fps: number, loop: boolean): PetAnimationAsset => ({
   src: animation(id, action),
   frames: 16,
   columns: 4,
   rows: 4,
   fps,
   loop,
+  timeline: petActionTimelines[id]?.[action],
   frameMap: id === "alaskan" && action === "touch"
     ? [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 0]
-    : id === "shepherd" && action === "feed"
-      ? [0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 6, 7, 8, 12, 13, 14]
-      : undefined,
+    : undefined,
   edgeCleanup: id === "maine-coon" ? "green-fringe" : undefined,
 });
 const animatedSkin = (id: string) => skin(id, {
@@ -185,9 +185,6 @@ document.body.innerHTML = `
   <main class="app-shell" id="app-shell">
     <section class="pet-stage" id="pet-stage" data-action="idle">
       <div class="speech-bubble" id="speech-bubble" role="status">${t("messages.defaultBubble")}</div>
-      <button class="settings-trigger" id="settings-button" aria-label="${t("accessibility.openSettings")}" data-tooltip="${t("actions.settings")}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75a2 2 0 0 1 1.93 1.48l.18.67a6.9 6.9 0 0 1 1.26.73l.67-.18a2 2 0 0 1 2.22.94l.5.87a2 2 0 0 1-.3 2.39l-.5.49c.03.29.05.58.05.87 0 .3-.02.59-.05.87l.5.5a2 2 0 0 1 .3 2.38l-.5.87a2 2 0 0 1-2.22.94l-.67-.18c-.4.28-.82.52-1.26.73l-.18.67A2 2 0 0 1 12 20.25h-1a2 2 0 0 1-1.93-1.48l-.18-.67a6.9 6.9 0 0 1-1.26-.73l-.67.18a2 2 0 0 1-2.22-.94l-.5-.87a2 2 0 0 1 .3-2.39l.5-.49A7.7 7.7 0 0 1 5 12c0-.3.02-.59.05-.87l-.5-.5a2 2 0 0 1-.3-2.38l.5-.87a2 2 0 0 1 2.22-.94l.67.18c.4-.28.82-.52 1.26-.73l.18-.67A2 2 0 0 1 11 3.75h1Z"/><circle cx="11.5" cy="12" r="2.4"/></svg>
-      </button>
       <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="${t("accessibility.interactWithPet")}">
         <div class="pet-shadow"></div>
         <div class="pet-aura"></div>
@@ -195,10 +192,15 @@ document.body.innerHTML = `
         <canvas class="pet-sprite" id="pet-sprite" aria-hidden="true" hidden></canvas>
         <span class="action-prop" id="action-prop" aria-hidden="true"></span>
       </div>
-      <div class="quick-actions" id="quick-actions" aria-label="${t("accessibility.quickActions")}">
-        <button class="quick-button" id="drink-button" aria-label="${t("actions.drink")}" data-tooltip="${t("actions.drink")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4s5 5.7 5 10a5 5 0 1 1-10 0c0-4.3 5-10 5-10Z"/><path d="M9.5 14.1c.25 1.3 1.08 2.05 2.5 2.25"/></svg></button>
-        <button class="quick-button" id="feed-button" aria-label="${t("actions.feed")}" data-tooltip="${t("actions.feed")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.1 5.5a3 3 0 0 0-4.2 4.2l.7.7-.7.7a3 3 0 0 0 4.2 4.2l.8-.7 5.4 5.4a3 3 0 0 0 4.2-4.2l-.7-.7.7-.8a3 3 0 0 0-4.2-4.2l-5.4-5.4-.8.8Z"/></svg></button>
-        <button class="quick-button" id="todo-button" aria-label="${t("actions.todo")}" data-tooltip="${t("actions.todo")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5h9M8.5 12h9M8.5 17.5h9"/><path d="m4 6.4.9.9 1.7-1.8M4 11.9l.9.9 1.7-1.8M4 17.4l.9.9 1.7-1.8"/></svg></button>
+      <div class="pet-controls">
+        <div class="quick-actions" id="quick-actions" aria-label="${t("accessibility.quickActions")}">
+          <button class="quick-button" id="drink-button" aria-label="${t("actions.drink")}" data-tooltip="${t("actions.drink")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4s5 5.7 5 10a5 5 0 1 1-10 0c0-4.3 5-10 5-10Z"/><path d="M9.5 14.1c.25 1.3 1.08 2.05 2.5 2.25"/></svg></button>
+          <button class="quick-button" id="feed-button" aria-label="${t("actions.feed")}" data-tooltip="${t("actions.feed")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.1 5.5a3 3 0 0 0-4.2 4.2l.7.7-.7.7a3 3 0 0 0 4.2 4.2l.8-.7 5.4 5.4a3 3 0 0 0 4.2-4.2l-.7-.7.7-.8a3 3 0 0 0-4.2-4.2l-5.4-5.4-.8.8Z"/></svg></button>
+          <button class="quick-button" id="todo-button" aria-label="${t("actions.todo")}" data-tooltip="${t("actions.todo")}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6.5h9M8.5 12h9M8.5 17.5h9"/><path d="m4 6.4.9.9 1.7-1.8M4 11.9l.9.9 1.7-1.8M4 17.4l.9.9 1.7-1.8"/></svg></button>
+        </div>
+        <button class="settings-trigger" id="settings-button" aria-label="${t("accessibility.openSettings")}" data-tooltip="${t("actions.settings")}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.75a2 2 0 0 1 1.93 1.48l.18.67a6.9 6.9 0 0 1 1.26.73l.67-.18a2 2 0 0 1 2.22.94l.5.87a2 2 0 0 1-.3 2.39l-.5.49c.03.29.05.58.05.87 0 .3-.02.59-.05.87l.5.5a2 2 0 0 1 .3 2.38l-.5.87a2 2 0 0 1-2.22.94l-.67-.18c-.4.28-.82.52-1.26.73l-.18.67A2 2 0 0 1 12 20.25h-1a2 2 0 0 1-1.93-1.48l-.18-.67a6.9 6.9 0 0 1-1.26-.73l-.67.18a2 2 0 0 1-2.22-.94l-.5-.87a2 2 0 0 1 .3-2.39l.5-.49A7.7 7.7 0 0 1 5 12c0-.3.02-.59.05-.87l-.5-.5a2 2 0 0 1-.3-2.38l.5-.87a2 2 0 0 1 2.22-.94l.67.18c.4-.28.82-.52 1.26-.73l.18-.67A2 2 0 0 1 11 3.75h1Z"/><circle cx="11.5" cy="12" r="2.4"/></svg>
+        </button>
       </div>
       <div class="pet-context-menu" id="pet-context-menu" role="menu" aria-label="${t("accessibility.petContextMenu")}" hidden>
         <button id="context-settings-button" role="menuitem"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.37 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.23 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1.1-.37H2.4v-4h.09A1.7 1.7 0 0 0 4 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.4 4.23a1.7 1.7 0 0 0 1-.63 1.7 1.7 0 0 0 .37-1.1V2.4h4v.09A1.7 1.7 0 0 0 15 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 8.4c.3.28.52.62.63 1 .1.34.13.71.09 1.1h.01v3.2H20a1.7 1.7 0 0 0-.6 1.3Z"/></svg><span>${t("actions.settings")}</span></button>
@@ -297,7 +299,7 @@ const setPetAction = (action: PetAction, duration = 900) => {
   }
   if (actionTimer) window.clearTimeout(actionTimer);
   if (action !== "idle" && action !== "run") {
-    const assetDuration = asset && !asset.loop ? (asset.frames / asset.fps) * 1000 : duration;
+    const assetDuration = asset && !asset.loop ? animationDurationMs(asset) : duration;
     actionTimer = window.setTimeout(() => setPetAction("idle", 0), assetDuration);
   }
 };

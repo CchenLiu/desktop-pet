@@ -33,7 +33,7 @@ test("pet context menu keeps the custom styled surface", () => {
   assert.doesNotMatch(main, /invoke\("show_pet_menu"\)/);
   assert.doesNotMatch(rust, /fn show_pet_menu/);
   assert.match(styles, /\.pet-context-menu \{/);
-  assert.match(styles, /\.settings-trigger,[\s\S]*\.quick-actions \{ opacity: 0; pointer-events: none;/);
+  assert.match(styles, /\.pet-controls \{[^}]*opacity: 0;[^}]*pointer-events: none;/);
 });
 
 test("native tray has an explicit icon, left-click restore, and a registered quit command", () => {
@@ -233,10 +233,14 @@ test("settings expansion preserves the collapsed pet position and restores it on
 });
 
 test("pet hover and settings shadows keep enough transparent gutter to avoid rectangular clipping", () => {
+  const main = read("src/main.ts");
   const styles = read("src/styles.css");
 
-  assert.match(styles, /\.settings-trigger \{[^}]*top: 16px;[^}]*right: 16px;/);
-  assert.match(styles, /\.quick-actions \{[^}]*bottom: 14px;/);
+  assert.match(main, /class="pet-controls"[\s\S]*class="quick-actions"[\s\S]*id="settings-button"/);
+  assert.match(styles, /\.pet-controls \{[^}]*bottom: 14px;/);
+  assert.match(styles, /\.settings-trigger \{[^}]*position: relative;/);
+  assert.doesNotMatch(styles, /\.settings-trigger \{[^}]*top: 16px;[^}]*right: 16px;/);
+  assert.match(styles, /\.quick-actions \{[^}]*display: flex;/);
   assert.match(styles, /\.settings-panel \{[^}]*inset: 28px;/);
 });
 
@@ -282,6 +286,27 @@ test("all four pets use complete frame-based sprite animation sets", () => {
   assert.match(player, /context\.drawImage/);
 });
 
+test("feeding and drinking use per-pet enter-loop-exit timelines lasting at least 2.8 seconds", async () => {
+  const { petActionTimelines } = await importTypeScriptModule("src/pet-animation-timelines.ts");
+  const player = read("src/sprite-player.ts");
+  const skin = read("src/pet-skin.ts");
+  const main = read("src/main.ts");
+
+  for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
+    for (const action of ["drink", "feed"]) {
+      const timeline = petActionTimelines[pet][action];
+      assert.ok(timeline.length > 24, `${pet}/${action} should repeat its middle action frames`);
+      assert.ok(timeline.reduce((total, step) => total + step.durationMs, 0) >= 2_800, `${pet}/${action} should last at least 2.8 seconds`);
+      assert.ok(new Set(timeline.map(({ frame }) => frame)).size < timeline.length, `${pet}/${action} should contain a repeated chew or lap loop`);
+    }
+  }
+  assert.match(main, /timeline: petActionTimelines\[id\]\?\.\[action\]/);
+  assert.match(skin, /timeline\?: AnimationFrameStep\[\]/);
+  assert.match(skin, /animationDurationMs/);
+  assert.match(skin, /animationFrameAt/);
+  assert.match(player, /animationFrameAt\(asset, elapsedMs\)/);
+});
+
 test("pet sprite sheets use isolated 4 by 4 cells and higher frame rates", () => {
   const main = read("src/main.ts");
   assert.match(main, /idle: animationAsset\(id, "idle", 10, true\)/);
@@ -304,9 +329,10 @@ test("pet sprite sheets use isolated 4 by 4 cells and higher frame rates", () =>
 test("problem animation sets keep stable frame maps and clean high-quality Maine Coon edges", () => {
   const main = read("src/main.ts");
   const player = read("src/sprite-player.ts");
+  const timelines = read("src/pet-animation-timelines.ts");
 
   assert.match(main, /id === "alaskan" && action === "touch"[\s\S]*\[0, 1, 2, 3, 2, 1, 0/);
-  assert.match(main, /id === "shepherd" && action === "feed"[\s\S]*5, 5, 5, 5, 5/);
+  assert.match(timelines, /shepherd:[\s\S]*repeat\(\[5, 6, 5, 7\], 4, 110\)/);
   assert.match(main, /id === "maine-coon" \? "green-fringe"/);
   assert.match(player, /asset\.frameMap\?\.\[frame\] \?\? frame/);
   assert.match(player, /cleanGreenFringe/);

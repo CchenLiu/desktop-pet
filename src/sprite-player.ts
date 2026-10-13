@@ -1,4 +1,4 @@
-import type { PetAnimationAsset } from "./pet-skin";
+import { animationDurationMs, animationFrameAt, type PetAnimationAsset } from "./pet-skin";
 
 type PlayOptions = {
   reduceMotion: boolean;
@@ -33,12 +33,13 @@ export class SpritePlayer {
     if (generation !== this.generation) return;
 
     const startedAt = performance.now();
+    const durationMs = animationDurationMs(asset);
     const render = (now: number) => {
       if (generation !== this.generation) return;
-      const elapsedFrames = options.reduceMotion ? 0 : Math.floor(((now - startedAt) / 1000) * asset.fps);
-      const frame = asset.loop ? elapsedFrames % asset.frames : Math.min(elapsedFrames, asset.frames - 1);
+      const elapsedMs = options.reduceMotion ? 0 : now - startedAt;
+      const frame = animationFrameAt(asset, elapsedMs);
       this.draw(image, frame, asset, options.size, options.flipX ?? false);
-      if (!options.reduceMotion && (asset.loop || elapsedFrames < asset.frames - 1)) {
+      if (!options.reduceMotion && (asset.loop || elapsedMs < durationMs)) {
         this.animationFrame = requestAnimationFrame(render);
       }
     };
