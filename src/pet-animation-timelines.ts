@@ -20,9 +20,8 @@ const drinkTimeline = (): AnimationTimelineStep[] => [
 ];
 
 const idleTimeline = (): AnimationTimelineStep[] => [
-  { frame: 0, durationMs: 4_200 },
-  ...frames([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 190),
-  { frame: 0, durationMs: 700 },
+  ...frames([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 150),
+  { frame: 0, durationMs: 600 },
 ];
 
 export const petActionTimelines: Record<string, ActionTimeline> = {

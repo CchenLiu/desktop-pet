@@ -81,6 +81,7 @@ const animationAsset = (id: string, action: PetAction, fps: number, loop: boolea
   rows: 4,
   fps,
   loop,
+  blendFrames: action === "idle",
   timeline: petActionTimelines[id]?.[action],
   frameMap: id === "alaskan" && action === "touch"
     ? [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 0]
@@ -88,7 +89,7 @@ const animationAsset = (id: string, action: PetAction, fps: number, loop: boolea
   edgeCleanup: id === "maine-coon" ? "green-fringe" : undefined,
 });
 const animatedSkin = (id: string) => skin(id, {
-  idle: animationAsset(id, "idle", 8, true),
+  idle: animationAsset(id, "idle", 10, true),
   touch: animationAsset(id, "touch", 16, false),
   drink: animationAsset(id, "drink", 16, false),
   feed: animationAsset(id, "feed", 16, false),

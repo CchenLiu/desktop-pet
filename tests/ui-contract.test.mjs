@@ -351,11 +351,14 @@ test("feeding and drinking use per-pet enter-loop-exit timelines lasting at leas
   assert.match(skin, /timeline\?: AnimationFrameStep\[\]/);
   assert.match(skin, /animationDurationMs/);
   assert.match(skin, /animationFrameAt/);
-  assert.match(player, /animationFrameAt\(asset, elapsedMs\)/);
+  assert.match(player, /animationFrameSampleAt\(asset, elapsedMs\)/);
 });
 
-test("idle animation leaves a long rest interval and keeps fallback breathing subtle", async () => {
+test("idle animation stays active with a short natural pause and blended frame transitions", async () => {
   const { petActionTimelines } = await importTypeScriptModule("src/pet-animation-timelines.ts");
+  const { animationFrameSampleAt } = await importTypeScriptModule("src/pet-skin.ts");
+  const main = read("src/main.ts");
+  const player = read("src/sprite-player.ts");
   const styles = read("src/styles.css");
 
   for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
@@ -364,18 +367,31 @@ test("idle animation leaves a long rest interval and keeps fallback breathing su
     const restingDuration = idle
       .filter(({ frame }) => frame === 0)
       .reduce((total, step) => total + step.durationMs, 0);
-    assert.ok(totalDuration >= 7_500, `${pet}/idle should use a calm cycle of at least 7.5 seconds`);
-    assert.ok(restingDuration >= 4_000, `${pet}/idle should remain still for at least 4 seconds per cycle`);
-    assert.ok(idle.filter(({ frame }) => frame !== 0).every(({ durationMs }) => durationMs >= 180), `${pet}/idle motion frames should not flicker rapidly`);
+    assert.ok(totalDuration >= 2_800 && totalDuration <= 3_600, `${pet}/idle should keep moving without an extended freeze`);
+    assert.ok(restingDuration >= 500 && restingDuration <= 1_000, `${pet}/idle should use only a short natural pause`);
+    assert.ok(idle.every(({ durationMs }) => durationMs >= 140), `${pet}/idle frames should not flicker rapidly`);
   }
-  assert.match(styles, /animation: idle-breathe 8s/);
+
+  const sample = animationFrameSampleAt({
+    src: "idle.png", frames: 2, columns: 2, rows: 1, fps: 10, loop: true,
+    blendFrames: true,
+    timeline: [{ frame: 0, durationMs: 150 }, { frame: 1, durationMs: 150 }],
+  }, 135);
+  assert.equal(sample.frame, 0);
+  assert.equal(sample.nextFrame, 1);
+  assert.ok(sample.blend > 0 && sample.blend < 1);
+  assert.match(main, /blendFrames: action === "idle"/);
+  assert.match(player, /animationFrameSampleAt\(asset, elapsedMs\)/);
+  assert.match(player, /drawFrame\(frame, 1\)/);
+  assert.doesNotMatch(player, /drawFrame\(frame, nextFrame === frame \? 1 : 1 - blend\)/);
+  assert.match(styles, /animation: idle-breathe 4\.8s/);
   assert.match(styles, /translateY\(-1px\) scale\(1\.004\)/);
   assert.doesNotMatch(styles, /translateY\(-2px\) scale\(1\.012\)/);
 });
 
 test("pet sprite sheets use isolated 4 by 4 cells and action-appropriate frame rates", () => {
   const main = read("src/main.ts");
-  assert.match(main, /idle: animationAsset\(id, "idle", 8, true\)/);
+  assert.match(main, /idle: animationAsset\(id, "idle", 10, true\)/);
   assert.match(main, /touch: animationAsset\(id, "touch", 16, false\)/);
   assert.match(main, /drink: animationAsset\(id, "drink", 16, false\)/);
   assert.match(main, /feed: animationAsset\(id, "feed", 16, false\)/);
@@ -400,7 +416,7 @@ test("problem animation sets keep stable frame maps and clean high-quality Maine
   assert.match(main, /id === "alaskan" && action === "touch"[\s\S]*\[0, 1, 2, 3, 2, 1, 0/);
   assert.match(timelines, /shepherd:[\s\S]*repeat\(\[7, 8, 9, 8\], 2, 180\)/);
   assert.match(main, /id === "maine-coon" \? "green-fringe"/);
-  assert.match(player, /asset\.frameMap\?\.\[frame\] \?\? frame/);
+  assert.match(player, /asset\.frameMap\?\.\[targetFrame\] \?\? targetFrame/);
   assert.match(player, /cleanGreenFringe/);
   assert.match(player, /imageSmoothingQuality = "high"/);
 });

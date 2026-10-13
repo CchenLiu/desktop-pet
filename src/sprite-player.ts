@@ -1,4 +1,4 @@
-import { animationDurationMs, animationFrameAt, type PetAnimationAsset } from "./pet-skin";
+import { animationDurationMs, animationFrameSampleAt, type PetAnimationAsset } from "./pet-skin";
 
 type PlayOptions = {
   reduceMotion: boolean;
@@ -37,8 +37,8 @@ export class SpritePlayer {
     const render = (now: number) => {
       if (generation !== this.generation) return;
       const elapsedMs = options.reduceMotion ? 0 : now - startedAt;
-      const frame = animationFrameAt(asset, elapsedMs);
-      this.draw(image, frame, asset, options.size, options.flipX ?? false);
+      const sample = animationFrameSampleAt(asset, elapsedMs);
+      this.draw(image, sample.frame, asset, options.size, options.flipX ?? false, sample.nextFrame, sample.blend);
       if (!options.reduceMotion && (asset.loop || elapsedMs < durationMs)) {
         this.animationFrame = requestAnimationFrame(render);
       }
@@ -89,7 +89,15 @@ export class SpritePlayer {
     return canvas;
   }
 
-  private draw(image: SpriteSheet, frame: number, asset: PetAnimationAsset, cssSize: number, flipX: boolean) {
+  private draw(
+    image: SpriteSheet,
+    frame: number,
+    asset: PetAnimationAsset,
+    cssSize: number,
+    flipX: boolean,
+    nextFrame = frame,
+    blend = 0,
+  ) {
     const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
     const outputSize = Math.round(cssSize * pixelRatio);
     if (this.canvas.width !== outputSize || this.canvas.height !== outputSize) {
@@ -107,9 +115,6 @@ export class SpritePlayer {
     const sourceHeight = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
     const sourceFrameWidth = sourceWidth / asset.columns;
     const sourceFrameHeight = sourceHeight / asset.rows;
-    const sourceFrame = asset.frameMap?.[frame] ?? frame;
-    const column = sourceFrame % asset.columns;
-    const row = Math.floor(sourceFrame / asset.columns);
     const safeInset = 1;
 
     context.save();
@@ -117,17 +122,25 @@ export class SpritePlayer {
       context.translate(outputSize, 0);
       context.scale(-1, 1);
     }
-    context.drawImage(
-      image,
-      column * sourceFrameWidth + safeInset,
-      row * sourceFrameHeight + safeInset,
-      sourceFrameWidth - safeInset * 2,
-      sourceFrameHeight - safeInset * 2,
-      0,
-      0,
-      outputSize,
-      outputSize,
-    );
+    const drawFrame = (targetFrame: number, opacity: number) => {
+      const sourceFrame = asset.frameMap?.[targetFrame] ?? targetFrame;
+      const column = sourceFrame % asset.columns;
+      const row = Math.floor(sourceFrame / asset.columns);
+      context.globalAlpha = opacity;
+      context.drawImage(
+        image,
+        column * sourceFrameWidth + safeInset,
+        row * sourceFrameHeight + safeInset,
+        sourceFrameWidth - safeInset * 2,
+        sourceFrameHeight - safeInset * 2,
+        0,
+        0,
+        outputSize,
+        outputSize,
+      );
+    };
+    drawFrame(frame, 1);
+    if (nextFrame !== frame && blend > 0) drawFrame(nextFrame, blend);
     context.restore();
   }
 }
