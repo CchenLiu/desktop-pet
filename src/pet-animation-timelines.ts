@@ -23,33 +23,33 @@ export const petActionTimelines: Record<string, ActionTimeline> = {
   alaskan: {
     drink: drinkTimeline(),
     feed: [
-      ...frames([0, 1, 2, 3, 4, 5], 100),
-      ...repeat([6, 7, 6, 8], 4, 110),
-      ...frames([9, 10, 11, 12, 13, 14, 15], 100),
+      ...frames([0, 1, 2, 3, 4, 5, 6, 7], 120),
+      ...repeat([8, 9, 10, 9], 2, 180),
+      ...frames([11, 12, 13, 14, 15], 150),
     ],
   },
   shepherd: {
     drink: drinkTimeline(),
     feed: [
-      ...frames([0, 1, 2, 3, 4, 5], 100),
-      ...repeat([5, 6, 5, 7], 4, 110),
-      ...frames([8, 9, 10, 11, 12, 13, 14, 15], 100),
+      ...frames([0, 1, 2, 3, 4, 5, 6], 120),
+      ...repeat([7, 8, 9, 8], 2, 180),
+      ...frames([10, 11, 12, 13, 14, 15], 130),
     ],
   },
   siamese: {
     drink: drinkTimeline(),
     feed: [
-      ...frames([0, 1, 2, 3], 100),
-      ...repeat([3, 4, 3, 5], 4, 110),
-      ...frames([6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 90),
+      ...frames([0, 1, 2, 3, 4], 130),
+      ...repeat([4, 5, 6, 5], 2, 190),
+      ...frames([7, 8, 9, 10, 11, 12, 13, 14, 15], 110),
     ],
   },
   "maine-coon": {
     drink: drinkTimeline(),
     feed: [
-      ...frames([0, 1, 2, 3], 100),
-      ...repeat([4, 5, 6, 5], 4, 110),
-      ...frames([7, 8, 9, 10, 11, 12, 13, 14, 15], 90),
+      ...frames([0, 1, 2, 3, 4], 130),
+      ...repeat([4, 5, 6, 5], 2, 190),
+      ...frames([7, 8, 9, 10, 11, 12, 13, 14, 15], 110),
     ],
   },
 };

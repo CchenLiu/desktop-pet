@@ -238,8 +238,10 @@ test("pet reminders stay visible until acknowledged and use species-specific cal
   assert.match(main, /petStage\.dataset\.species = pet\.id === "alaskan" \|\| pet\.id === "shepherd" \? "dog" : "cat"/);
   assert.match(styles, /data-action="remind"\]\[data-species="dog"\] \.pet-sprite/);
   assert.match(styles, /data-action="remind"\]\[data-species="cat"\] \.pet-sprite/);
-  assert.match(styles, /@keyframes dog-bark/);
-  assert.match(styles, /@keyframes cat-call/);
+  assert.match(styles, /@keyframes dog-alert-hop/);
+  assert.match(styles, /@keyframes cat-alert-hop/);
+  assert.doesNotMatch(styles, /@keyframes dog-bark/);
+  assert.doesNotMatch(styles, /@keyframes cat-call/);
   assert.match(zh, /acknowledgeReminder: "知道了"/);
   assert.match(en, /acknowledgeReminder: "Got it"/);
 });
@@ -335,12 +337,15 @@ test("feeding and drinking use per-pet enter-loop-exit timelines lasting at leas
   const main = read("src/main.ts");
 
   for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
-    for (const action of ["drink", "feed"]) {
-      const timeline = petActionTimelines[pet][action];
-      assert.ok(timeline.length > 24, `${pet}/${action} should repeat its middle action frames`);
-      assert.ok(timeline.reduce((total, step) => total + step.durationMs, 0) >= 2_800, `${pet}/${action} should last at least 2.8 seconds`);
-      assert.ok(new Set(timeline.map(({ frame }) => frame)).size < timeline.length, `${pet}/${action} should contain a repeated chew or lap loop`);
-    }
+    const drink = petActionTimelines[pet].drink;
+    assert.ok(drink.length > 24, `${pet}/drink should repeat its middle action frames`);
+    assert.ok(drink.reduce((total, step) => total + step.durationMs, 0) >= 2_800, `${pet}/drink should last at least 2.8 seconds`);
+
+    const feed = petActionTimelines[pet].feed;
+    assert.ok(feed.length >= 18 && feed.length <= 24, `${pet}/feed should avoid rapid excessive mouth switching`);
+    assert.ok(feed.filter(({ durationMs }) => durationMs >= 170).length >= 8, `${pet}/feed should hold gentle chew frames long enough`);
+    assert.ok(feed.reduce((total, step) => total + step.durationMs, 0) >= 2_800, `${pet}/feed should last at least 2.8 seconds`);
+    assert.ok(new Set(feed.map(({ frame }) => frame)).size < feed.length, `${pet}/feed should retain a gentle chew loop`);
   }
   assert.match(main, /timeline: petActionTimelines\[id\]\?\.\[action\]/);
   assert.match(skin, /timeline\?: AnimationFrameStep\[\]/);
@@ -374,7 +379,7 @@ test("problem animation sets keep stable frame maps and clean high-quality Maine
   const timelines = read("src/pet-animation-timelines.ts");
 
   assert.match(main, /id === "alaskan" && action === "touch"[\s\S]*\[0, 1, 2, 3, 2, 1, 0/);
-  assert.match(timelines, /shepherd:[\s\S]*repeat\(\[5, 6, 5, 7\], 4, 110\)/);
+  assert.match(timelines, /shepherd:[\s\S]*repeat\(\[7, 8, 9, 8\], 2, 180\)/);
   assert.match(main, /id === "maine-coon" \? "green-fringe"/);
   assert.match(player, /asset\.frameMap\?\.\[frame\] \?\? frame/);
   assert.match(player, /cleanGreenFringe/);

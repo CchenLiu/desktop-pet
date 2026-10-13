@@ -182,8 +182,8 @@ html[data-panel-open="true"] .pet-stage { display: none; }
 .pet-stage[data-action="feed"] .action-prop { opacity: 1; animation: prop-pop 1.1s ease; }
 .pet-stage[data-action="feed"] .action-prop::after { content: "🍪"; }
 .pet-stage[data-action="remind"] .pet-image { animation: remind-bounce .55s ease 3; }
-.pet-stage[data-action="remind"][data-species="dog"] .pet-sprite { animation: dog-bark 1.25s cubic-bezier(.36,.08,.2,1) infinite; }
-.pet-stage[data-action="remind"][data-species="cat"] .pet-sprite { animation: cat-call 1.65s cubic-bezier(.4,0,.2,1) infinite; }
+.pet-stage[data-action="remind"][data-species="dog"] .pet-sprite { animation: dog-alert-hop 1.45s cubic-bezier(.34,.05,.22,1) infinite; }
+.pet-stage[data-action="remind"][data-species="cat"] .pet-sprite { animation: cat-alert-hop 1.75s cubic-bezier(.4,0,.2,1) infinite; }
 .pet-stage[data-action="remind"] .call-mark { opacity: 1; animation: call-mark-pulse 1.25s ease-in-out infinite; }
 .pet-stage[data-action="remind"] .pet-aura { opacity: .9; animation: aura-pulse .8s ease infinite alternate; }
 .pet-stage[data-action="happy"] .pet-image { animation: happy-hop .75s ease 2; }
@@ -200,8 +200,8 @@ html[data-reduce-motion="true"] *::after { animation-duration: .001ms !important
 @keyframes drink-nod { 0%,100% { transform: rotate(0); } 35%,65% { transform: translateY(3px) rotate(3deg); } }
 @keyframes feed-chew { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.96) translateY(2px); } }
 @keyframes remind-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-@keyframes dog-bark { 0%,22%,52%,100% { transform: translate(0, 0) rotate(0); } 28% { transform: translate(2px, 1px) rotate(1.4deg) scale(1.018,.985); } 34% { transform: translate(-1px, 0) rotate(-.7deg) scale(.992,1.01); } 42% { transform: translate(2px, 1px) rotate(1deg) scale(1.012,.99); } }
-@keyframes cat-call { 0%,28%,72%,100% { transform: translate(0, 0) rotate(0); } 36% { transform: translateY(-2px) rotate(-1deg) scaleY(1.018); } 48% { transform: translateY(-3px) rotate(1deg) scale(1.008,1.025); } 60% { transform: translateY(-1px) rotate(-.5deg); } }
+@keyframes dog-alert-hop { 0%,20%,52%,100% { transform: translateY(0) scale(1); } 28% { transform: translateY(-10px) scale(.995,1.012); } 36% { transform: translateY(0) scale(1.025,.975); } 43% { transform: translateY(-3px) scale(1); } }
+@keyframes cat-alert-hop { 0%,24%,62%,100% { transform: translateY(0) scale(1); } 34% { transform: translateY(-8px) scale(.99,1.018); } 44% { transform: translateY(0) scale(1.018,.982); } 52% { transform: translateY(-2px) scale(1); } }
 @keyframes call-mark-pulse { 0%,18%,58%,100% { opacity: 0; transform: translateX(-3px) rotate(-13deg) scale(.78); } 28%,46% { opacity: .88; transform: translateX(0) rotate(-13deg) scale(1); } }
 @keyframes happy-hop { 0%,100% { transform: translateY(0) scale(1); } 45% { transform: translateY(-10px) scale(1.04); } }
 @keyframes prop-pop { 0%,100% { opacity: 0; transform: scale(.5) translateY(6px); } 25%,70% { opacity: 1; transform: scale(1) translateY(0); } }
