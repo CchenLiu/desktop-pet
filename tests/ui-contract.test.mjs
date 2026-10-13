@@ -101,32 +101,48 @@ test("escape closes settings and todo while todo close uses an allowed hide comm
   assert.match(todo, /const closeTodoWindow = \(\) =>/);
   assert.match(todo, /byId\("close-todo"\)\.addEventListener\("click", closeTodoWindow\)/);
   assert.match(todo, /event\.key !== "Escape"/);
-  assert.match(todo, /setReminderPopoverOpen\(false\)[\s\S]*?closeTodoWindow\(\)/);
+  assert.match(todo, /invoke\("hide_reminder_picker"\)/);
+  assert.match(todo, /closeTodoWindow\(\)/);
   assert.match(main, /event\.key === "Escape" && panelOpen/);
   assert.match(main, /setPanelOpen\(false\)/);
 });
 
 test("todo reminder requires explicit confirmation and can be cancelled", () => {
+  const config = JSON.parse(read("src-tauri/tauri.conf.json"));
+  const capabilities = JSON.parse(read("src-tauri/capabilities/default.json"));
   const todo = read("src/todo.ts");
-  const styles = read("src/todo.css");
+  const picker = read("src/reminder-picker.ts");
+  const styles = read("src/reminder-picker.css");
+  const rust = read("src-tauri/src/lib.rs");
+  const vite = read("vite.config.ts");
   const zhCN = read("src/i18n/zh-CN.ts");
   const enUS = read("src/i18n/en-US.ts");
+  const pickerWindow = config.app.windows.find(({ label }) => label === "reminder-picker");
 
-  assert.match(todo, /id="reminder-confirm"/);
-  assert.match(todo, /id="reminder-cancel"/);
-  assert.match(todo, /id="reminder-popover"/);
-  assert.match(todo, /class="calendar-grid"/);
-  assert.match(todo, /data-calendar-day/);
-  assert.match(todo, /id="reminder-hour"/);
-  assert.match(todo, /id="reminder-minute"/);
-  assert.doesNotMatch(todo, /datetime-local/);
-  assert.doesNotMatch(todo, /showPicker/);
+  assert.equal(pickerWindow.url, "reminder.html");
+  assert.ok(pickerWindow.width >= 300 && pickerWindow.width <= 340);
+  assert.ok(pickerWindow.height <= 380);
+  assert.equal(pickerWindow.decorations, false);
+  assert.equal(pickerWindow.transparent, true);
+  assert.ok(capabilities.windows.includes("reminder-picker"));
+  assert.match(vite, /reminder:.*reminder\.html/);
+  assert.match(todo, /invoke\("show_reminder_picker", \{ value: confirmedReminder \}\)/);
+  assert.match(todo, /listen<string>\("reminder-picker-confirm"/);
+  assert.doesNotMatch(todo, /id="reminder-popover"/);
+  assert.doesNotMatch(todo, /calendarOpen \? 420/);
+  assert.match(picker, /id="reminder-confirm"/);
+  assert.match(picker, /id="reminder-cancel"/);
+  assert.match(picker, /class="calendar-grid"/);
+  assert.match(picker, /data-calendar-day/);
+  assert.match(picker, /id="reminder-time" type="time"/);
+  assert.match(picker, /emitTo\("todo", "reminder-picker-confirm"/);
+  assert.match(picker, /event\.key !== "Escape"/);
+  assert.match(styles, /\.picker-actions \{[^}]*justify-content: space-between;/);
+  assert.match(rust, /fn show_reminder_picker/);
+  assert.match(rust, /get_webview_window\("reminder-picker"\)/);
+  assert.match(rust, /emit\("reminder-picker-open"/);
   assert.match(todo, /let confirmedReminder = ""/);
-  assert.match(todo, /confirmedReminder = buildReminderValue\(\)/);
-  assert.match(todo, /restoreReminderDraft\(confirmedReminder\)/);
   assert.match(todo, /remindAt: confirmedReminder/);
-  assert.match(styles, /\.reminder-popover/);
-  assert.match(styles, /\.calendar-grid/);
   assert.match(zhCN, /confirmReminder: "确认提醒时间"/);
   assert.match(zhCN, /cancelReminder: "取消本次设置"/);
   assert.match(enUS, /confirmReminder: "Confirm reminder time"/);
@@ -297,7 +313,7 @@ test("todo quick action opens a dedicated native todo window", () => {
   assert.doesNotMatch(main, /id="todo-section"/);
   assert.match(rust, /fn show_todo_window/);
   assert.match(rust, /get_webview_window\("todo"\)/);
-  assert.match(rust, /generate_handler!\[quit_app, show_todo_window\]/);
+  assert.match(rust, /generate_handler!\[[\s\S]*?quit_app,[\s\S]*?show_todo_window/);
 });
 
 test("dedicated todo list supports add, complete, delete, filters, and priority labels", () => {

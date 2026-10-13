@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         todo: fileURLToPath(new URL("./todo.html", import.meta.url)),
+        reminder: fileURLToPath(new URL("./reminder.html", import.meta.url)),
       },
     },
   },

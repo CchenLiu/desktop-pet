@@ -1,6 +1,7 @@
 import "./todo.css";
 
 import { LogicalSize } from "@tauri-apps/api/dpi";
+import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getLocale, t } from "./i18n";
@@ -18,12 +19,7 @@ const priorityOrder: TodoPriority[] = ["normal", "important", "urgent"];
 let todos = loadTodos();
 let activeFilter: TodoFilter = "all";
 let confirmedReminder = "";
-let selectedCalendarDate = new Date();
-let calendarMonth = new Date(selectedCalendarDate.getFullYear(), selectedCalendarDate.getMonth(), 1);
 const todoWindow = getCurrentWindow();
-
-const pad2 = (value: number) => String(value).padStart(2, "0");
-const localDateValue = (date: Date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({
   "&": "&amp;",
@@ -58,8 +54,8 @@ document.body.innerHTML = `
           <label class="sr-only" for="todo-title">${t("todo.placeholder")}</label>
           <input id="todo-title" class="todo-input" placeholder="${t("todo.placeholder")}" autocomplete="off" />
 
-          <div id="reminder-control" class="compact-control reminder-control">
-            <button id="reminder-button" class="compact-control-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="reminder-popover" aria-label="${t("todo.remindAt")}" title="${t("todo.remindAt")}">
+          <div class="compact-control reminder-control">
+            <button id="reminder-button" class="compact-control-button" type="button" aria-haspopup="dialog" aria-label="${t("todo.remindAt")}" title="${t("todo.remindAt")}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" /></svg>
             </button>
           </div>
@@ -75,35 +71,6 @@ document.body.innerHTML = `
           </button>
         </div>
         <p class="input-error" id="title-error" role="alert" hidden>${t("todo.titleRequired")}</p>
-
-        <section id="reminder-popover" class="reminder-popover" role="dialog" aria-label="${t("todo.calendarLabel")}" hidden>
-          <header class="calendar-header">
-            <button id="calendar-previous" type="button" aria-label="${t("todo.previousMonth")}" title="${t("todo.previousMonth")}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
-            </button>
-            <strong id="calendar-month"></strong>
-            <button id="calendar-next" type="button" aria-label="${t("todo.nextMonth")}" title="${t("todo.nextMonth")}">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-            </button>
-          </header>
-          <div id="calendar-weekdays" class="calendar-weekdays" aria-hidden="true"></div>
-          <div id="calendar-grid" class="calendar-grid"></div>
-          <div class="calendar-footer">
-            <div class="time-fields" aria-label="${t("todo.reminderDateTime")}">
-              <label><span>${t("todo.hour")}</span><input id="reminder-hour" type="number" min="0" max="23" inputmode="numeric" /></label>
-              <span aria-hidden="true">:</span>
-              <label><span>${t("todo.minute")}</span><input id="reminder-minute" type="number" min="0" max="59" inputmode="numeric" /></label>
-            </div>
-            <div class="calendar-actions">
-              <button id="reminder-cancel" class="calendar-action cancel" type="button" aria-label="${t("todo.cancelReminder")}" title="${t("todo.cancelReminder")}">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
-              </button>
-              <button id="reminder-confirm" class="calendar-action confirm" type="button" aria-label="${t("todo.confirmReminder")}" title="${t("todo.confirmReminder")}">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
-              </button>
-            </div>
-          </div>
-        </section>
       </section>
 
       <div id="todo-results" class="todo-results" hidden>
@@ -141,61 +108,13 @@ const updateReminderButton = () => {
   button.setAttribute("aria-label", button.title);
 };
 
-const buildReminderValue = () => {
-  const hour = Math.max(0, Math.min(23, Number(byId<HTMLInputElement>("reminder-hour").value) || 0));
-  const minute = Math.max(0, Math.min(59, Number(byId<HTMLInputElement>("reminder-minute").value) || 0));
-  return `${localDateValue(selectedCalendarDate)}T${pad2(hour)}:${pad2(minute)}`;
-};
-
-const restoreReminderDraft = (value: string) => {
-  const fallback = new Date(Date.now() + 5 * 60_000);
-  fallback.setSeconds(0, 0);
-  const parsed = value ? new Date(value) : fallback;
-  selectedCalendarDate = Number.isNaN(parsed.getTime()) ? fallback : parsed;
-  calendarMonth = new Date(selectedCalendarDate.getFullYear(), selectedCalendarDate.getMonth(), 1);
-  byId<HTMLInputElement>("reminder-hour").value = pad2(selectedCalendarDate.getHours());
-  byId<HTMLInputElement>("reminder-minute").value = pad2(selectedCalendarDate.getMinutes());
-};
-
-const renderCalendar = () => {
-  const locale = getLocale();
-  byId<HTMLElement>("calendar-month").textContent = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(calendarMonth);
-  const sunday = new Date(2024, 0, 7);
-  byId<HTMLElement>("calendar-weekdays").innerHTML = Array.from({ length: 7 }, (_, index) => {
-    const day = new Date(sunday);
-    day.setDate(sunday.getDate() + index);
-    return `<span>${new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(day)}</span>`;
-  }).join("");
-
-  const firstCell = new Date(calendarMonth);
-  firstCell.setDate(1 - firstCell.getDay());
-  const todayKey = localDateValue(new Date());
-  const selectedKey = localDateValue(selectedCalendarDate);
-  byId<HTMLElement>("calendar-grid").innerHTML = Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(firstCell);
-    day.setDate(firstCell.getDate() + index);
-    const key = localDateValue(day);
-    const outside = day.getMonth() !== calendarMonth.getMonth();
-    return `<button type="button" data-calendar-day="${key}" class="${outside ? "outside " : ""}${key === todayKey ? "today " : ""}${key === selectedKey ? "selected" : ""}" aria-label="${new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(day)}">${day.getDate()}</button>`;
-  }).join("");
-};
-
 const resizeTodoWindow = () => {
-  const calendarOpen = !byId<HTMLElement>("reminder-popover").hidden;
-  const targetHeight = calendarOpen ? 420 : todos.length === 0 ? 180 : Math.min(420, 238 + Math.min(2, todos.length) * 70);
+  const targetHeight = todos.length === 0 ? 180 : Math.min(420, 238 + Math.min(2, todos.length) * 70);
   void todoWindow.setSize(new LogicalSize(480, targetHeight));
 };
 
-const setReminderPopoverOpen = (open: boolean) => {
-  byId<HTMLElement>("reminder-popover").hidden = !open;
-  byId<HTMLButtonElement>("reminder-button").setAttribute("aria-expanded", String(open));
-  if (open) renderCalendar();
-  resizeTodoWindow();
-};
-
 const closeTodoWindow = () => {
-  restoreReminderDraft(confirmedReminder);
-  setReminderPopoverOpen(false);
+  void invoke("hide_reminder_picker");
   void todoWindow.hide();
 };
 
@@ -222,7 +141,6 @@ const render = () => {
       </button>
     </article>
   `).join("");
-
   resizeTodoWindow();
 };
 
@@ -246,7 +164,7 @@ const addTodo = () => {
   }));
   titleInput.value = "";
   confirmedReminder = "";
-  setReminderPopoverOpen(false);
+  void invoke("hide_reminder_picker");
   updateReminderButton();
   updatePriorityButton("normal");
   persist();
@@ -257,35 +175,14 @@ const addTodo = () => {
 byId("add-todo").addEventListener("click", addTodo);
 byId("close-todo").addEventListener("click", closeTodoWindow);
 byId("reminder-button").addEventListener("click", () => {
-  restoreReminderDraft(confirmedReminder);
-  setReminderPopoverOpen(true);
+  void invoke("show_reminder_picker", { value: confirmedReminder });
 });
-byId("reminder-confirm").addEventListener("click", () => {
-  confirmedReminder = buildReminderValue();
-  setReminderPopoverOpen(false);
+void listen<string>("reminder-picker-confirm", ({ payload }) => {
+  confirmedReminder = payload;
   updateReminderButton();
+  byId<HTMLInputElement>("todo-title").focus();
 });
-byId("reminder-cancel").addEventListener("click", () => {
-  restoreReminderDraft(confirmedReminder);
-  setReminderPopoverOpen(false);
-  updateReminderButton();
-});
-byId("calendar-previous").addEventListener("click", () => {
-  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
-  renderCalendar();
-});
-byId("calendar-next").addEventListener("click", () => {
-  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
-  renderCalendar();
-});
-byId("calendar-grid").addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-calendar-day]");
-  if (!button?.dataset.calendarDay) return;
-  const [year, month, day] = button.dataset.calendarDay.split("-").map(Number);
-  selectedCalendarDate = new Date(year, month - 1, day);
-  calendarMonth = new Date(year, month - 1, 1);
-  renderCalendar();
-});
+void listen("reminder-picker-cancel", () => byId<HTMLInputElement>("todo-title").focus());
 byId("priority-button").addEventListener("click", () => {
   const current = byId<HTMLInputElement>("todo-priority").value as TodoPriority;
   updatePriorityButton(priorityOrder[(priorityOrder.indexOf(current) + 1) % priorityOrder.length]);
@@ -304,13 +201,6 @@ byId<HTMLInputElement>("todo-title").addEventListener("keydown", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   event.preventDefault();
-  const popover = byId<HTMLElement>("reminder-popover");
-  if (!popover.hidden) {
-    restoreReminderDraft(confirmedReminder);
-    setReminderPopoverOpen(false);
-    byId<HTMLButtonElement>("reminder-button").focus();
-    return;
-  }
   closeTodoWindow();
 });
 byId("todo-list").addEventListener("change", (event) => {

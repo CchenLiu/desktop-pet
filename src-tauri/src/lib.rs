@@ -60,6 +60,57 @@ fn show_todo_window(app: tauri::AppHandle) {
     let _ = todo.set_focus();
 }
 
+#[tauri::command]
+fn show_reminder_picker(app: tauri::AppHandle, value: String) {
+    let (Some(picker), Some(todo)) = (
+        app.get_webview_window("reminder-picker"),
+        app.get_webview_window("todo"),
+    ) else {
+        return;
+    };
+
+    if let (Ok(todo_position), Ok(todo_size), Ok(picker_size), Ok(Some(monitor))) = (
+        todo.outer_position(),
+        todo.outer_size(),
+        picker.outer_size(),
+        todo.current_monitor(),
+    ) {
+        let work_area = monitor.work_area();
+        let work_left = work_area.position.x;
+        let work_top = work_area.position.y;
+        let work_right = work_left + work_area.size.width as i32;
+        let work_bottom = work_top + work_area.size.height as i32;
+        let picker_width = picker_size.width as i32;
+        let picker_height = picker_size.height as i32;
+        let preferred_x = todo_position.x + todo_size.width as i32 - picker_width - 72;
+        let below_y = todo_position.y + todo_size.height as i32 + 6;
+        let above_y = todo_position.y - picker_height - 6;
+        let max_x = (work_right - picker_width).max(work_left);
+        let max_y = (work_bottom - picker_height).max(work_top);
+        let x = preferred_x.clamp(work_left, max_x);
+        let y = if below_y + picker_height <= work_bottom {
+            below_y
+        } else if above_y >= work_top {
+            above_y
+        } else {
+            below_y.clamp(work_top, max_y)
+        };
+        let _ = picker.set_position(PhysicalPosition::new(x, y));
+    }
+
+    let _ = picker.emit("reminder-picker-open", value);
+    let _ = picker.unminimize();
+    let _ = picker.show();
+    let _ = picker.set_focus();
+}
+
+#[tauri::command]
+fn hide_reminder_picker(app: tauri::AppHandle) {
+    if let Some(picker) = app.get_webview_window("reminder-picker") {
+        let _ = picker.hide();
+    }
+}
+
 fn setup_tray(app: &tauri::AppHandle) {
     let tray_locale = locale::load();
     let result: tauri::Result<()> = (|| {
@@ -132,7 +183,12 @@ pub fn run() {
         Some(tauri::utils::config::AppDirectoriesOverride::Root(data_dir));
 
     let app = tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![quit_app, show_todo_window])
+        .invoke_handler(tauri::generate_handler![
+            quit_app,
+            show_todo_window,
+            show_reminder_picker,
+            hide_reminder_picker
+        ])
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
