@@ -19,6 +19,7 @@ const zhCN = {
     feed: "喂食",
     todo: "Todo",
     settings: "打开设置",
+    acknowledgeReminder: "知道了",
     quit: "退出",
   },
   hydration: {

@@ -19,6 +19,7 @@ const enUS = {
     feed: "Feed",
     todo: "Todo",
     settings: "Open settings",
+    acknowledgeReminder: "Got it",
     quit: "Quit",
   },
   hydration: {

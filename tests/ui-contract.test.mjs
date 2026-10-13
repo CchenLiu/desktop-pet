@@ -190,16 +190,16 @@ test("due todo reminders are checked immediately after sync and every second", (
   const engine = read("src/reminder-engine.ts");
 
   assert.match(main, /const runReminderChecks = \(now = Date\.now\(\)\)/);
-  assert.match(main, /isTodoReminderDue\(todo, now\)/);
+  assert.match(main, /findNextDueTodo\(state\.todos, now\)/);
   assert.match(engine, /new Date\(todo\.remindAt\)\.getTime\(\)/);
   assert.match(engine, /dueAt <= now/);
-  assert.match(main, /showMessage\(t\("messages\.todoReminder"/);
+  assert.match(main, /showPersistentReminder\(t\("messages\.todoReminder"/);
   assert.match(main, /setInterval\(runReminderChecks, 1_000\)/);
   assert.match(main, /listen<Todo\[]>\(todoEventName,[\s\S]*?runReminderChecks\(\)/);
 });
 
 test("todo due-time predicate handles due, future, completed, and notified tasks", async () => {
-  const { isTodoReminderDue } = await importTypeScriptModule("src/reminder-engine.ts");
+  const { acknowledgeTodoReminder, findNextDueTodo, isTodoReminderDue, migrateTodoAcknowledgements } = await importTypeScriptModule("src/reminder-engine.ts");
   const now = Date.parse("2026-10-13T10:30:00");
   const todo = { title: "test", done: false, notified: false, remindAt: "2026-10-13T10:30" };
 
@@ -207,6 +207,41 @@ test("todo due-time predicate handles due, future, completed, and notified tasks
   assert.equal(isTodoReminderDue({ ...todo, remindAt: "2026-10-13T10:31" }, now), false);
   assert.equal(isTodoReminderDue({ ...todo, done: true }, now), false);
   assert.equal(isTodoReminderDue({ ...todo, notified: true }, now), false);
+
+  const todos = [
+    { ...todo, id: "later", remindAt: "2026-10-13T10:29" },
+    { ...todo, id: "first", remindAt: "2026-10-13T10:28" },
+  ];
+  assert.equal(findNextDueTodo(todos, now)?.id, "first");
+  assert.equal(todos[1].notified, false, "showing a reminder must not acknowledge it");
+  assert.equal(acknowledgeTodoReminder(todos, "first"), true);
+  assert.equal(todos[1].notified, true);
+  assert.equal(findNextDueTodo(todos, now)?.id, "later");
+
+  assert.equal(migrateTodoAcknowledgements([{ ...todo, notified: true }], 0)[0].notified, false);
+  assert.equal(migrateTodoAcknowledgements([{ ...todo, notified: true }], 1)[0].notified, true);
+});
+
+test("pet reminders stay visible until acknowledged and use species-specific call motion", () => {
+  const main = read("src/main.ts");
+  const styles = read("src/styles.css");
+  const zh = read("src/i18n/zh-CN.ts");
+  const en = read("src/i18n/en-US.ts");
+
+  assert.match(main, /id="reminder-acknowledge"/);
+  assert.match(main, /const showPersistentReminder =/);
+  assert.match(main, /const acknowledgeReminder =/);
+  assert.match(main, /findNextDueTodo\(state\.todos, now\)/);
+  assert.match(main, /acknowledgeTodoReminder\(state\.todos, activeReminder\.todoId\)/);
+  assert.match(main, /migrateTodoAcknowledgements\([\s\S]*?stored\.reminderAcknowledgementVersion/);
+  assert.doesNotMatch(main, /if \(isTodoReminderDue\(todo, now\)\) \{[\s\S]*?todo\.notified = true/);
+  assert.match(main, /petStage\.dataset\.species = pet\.id === "alaskan" \|\| pet\.id === "shepherd" \? "dog" : "cat"/);
+  assert.match(styles, /data-action="remind"\]\[data-species="dog"\] \.pet-sprite/);
+  assert.match(styles, /data-action="remind"\]\[data-species="cat"\] \.pet-sprite/);
+  assert.match(styles, /@keyframes dog-bark/);
+  assert.match(styles, /@keyframes cat-call/);
+  assert.match(zh, /acknowledgeReminder: "知道了"/);
+  assert.match(en, /acknowledgeReminder: "Got it"/);
 });
 
 test("todo window opens beside the pet and stays inside the current monitor work area", () => {

@@ -19,17 +19,18 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
 import { petActionTimelines } from "./pet-animation-timelines";
 import { animationDurationMs, type PetAction, type PetAnimationAsset, type PetSkinManifest } from "./pet-skin";
-import { isTodoReminderDue } from "./reminder-engine";
+import { acknowledgeTodoReminder, findNextDueTodo, migrateTodoAcknowledgements } from "./reminder-engine";
 import { SpritePlayer } from "./sprite-player";
 import { normalizeTodo, todoEventName, type Todo } from "./todo-store";
 
 type ReminderMode = "interval" | "fixed";
 type TargetMode = "guideline" | "custom";
 type GuidelineProfile = "female" | "male";
+type ActiveReminder = { kind: "hydration" } | { kind: "todo"; todoId: string };
 
 type Pet = {
   id: string;
@@ -56,6 +57,7 @@ type AppState = {
   reminderValue: string;
   lastHydrationReminderAt: number;
   lastHydrationReminderKey: string;
+  reminderAcknowledgementVersion: number;
   todos: Todo[];
   position?: { x: number; y: number };
 };
@@ -118,6 +120,7 @@ let stopTodoSync: (() => void) | undefined;
 let panelOpen = false;
 let currentAction: PetAction = "idle";
 let petFacing: "left" | "right" = "right";
+let activeReminder: ActiveReminder | undefined;
 
 const localDateKey = (date = new Date()) => {
   const year = date.getFullYear();
@@ -142,6 +145,7 @@ const defaultState = (): AppState => ({
   reminderValue: "60",
   lastHydrationReminderAt: Date.now(),
   lastHydrationReminderKey: "",
+  reminderAcknowledgementVersion: 1,
   todos: [],
 });
 
@@ -160,7 +164,10 @@ const loadState = (): AppState => {
       version: 3,
       petSize: migratedPetSize,
       customTarget: "customTarget" in stored ? Number(stored.customTarget) : Number(oldest?.dailyTarget ?? 1600),
-      todos: (stored.todos ?? []).map(normalizeTodo),
+      todos: migrateTodoAcknowledgements(
+        (stored.todos ?? []).map(normalizeTodo),
+        Number(stored.reminderAcknowledgementVersion ?? 0),
+      ),
     };
     next.petSize = Math.max(48, Math.min(220, next.petSize || 100));
     if (next.waterDate !== localDateKey()) {
@@ -184,13 +191,20 @@ const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) 
 document.body.innerHTML = `
   <main class="app-shell" id="app-shell">
     <section class="pet-stage" id="pet-stage" data-action="idle">
-      <div class="speech-bubble" id="speech-bubble" role="status">${t("messages.defaultBubble")}</div>
+      <div class="speech-bubble" id="speech-bubble" role="status" aria-live="polite">
+        <span class="speech-message" id="speech-message">${t("messages.defaultBubble")}</span>
+        <button class="reminder-acknowledge" id="reminder-acknowledge" type="button" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
+          <span>${t("actions.acknowledgeReminder")}</span>
+        </button>
+      </div>
       <div class="pet-surface" id="pet-surface" tabindex="0" role="button" aria-label="${t("accessibility.interactWithPet")}">
         <div class="pet-shadow"></div>
         <div class="pet-aura"></div>
         <img class="pet-image" id="pet-image" alt="" draggable="false" />
         <canvas class="pet-sprite" id="pet-sprite" aria-hidden="true" hidden></canvas>
         <span class="action-prop" id="action-prop" aria-hidden="true"></span>
+        <span class="call-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       </div>
       <div class="pet-controls">
         <div class="quick-actions" id="quick-actions" aria-label="${t("accessibility.quickActions")}">
@@ -256,6 +270,8 @@ const petStage = byId<HTMLElement>("pet-stage");
 const petSurface = byId<HTMLElement>("pet-surface");
 const settingsPanel = byId<HTMLElement>("settings-panel");
 const speechBubble = byId<HTMLElement>("speech-bubble");
+const speechMessage = byId<HTMLElement>("speech-message");
+const reminderAcknowledge = byId<HTMLButtonElement>("reminder-acknowledge");
 const petImage = byId<HTMLImageElement>("pet-image");
 const petSprite = byId<HTMLCanvasElement>("pet-sprite");
 const spritePlayer = new SpritePlayer(petSprite);
@@ -272,13 +288,18 @@ const hidePetContextMenu = () => {
   petContextMenu.hidden = true;
 };
 const showMessage = (message: string, duration = 3200) => {
-  speechBubble.textContent = message;
+  if (activeReminder) return;
+  speechMessage.textContent = message;
+  reminderAcknowledge.hidden = true;
+  speechBubble.classList.remove("reminder");
+  speechBubble.setAttribute("role", "status");
+  speechBubble.setAttribute("aria-live", "polite");
   speechBubble.classList.add("visible");
   if (messageTimer) window.clearTimeout(messageTimer);
   messageTimer = window.setTimeout(() => speechBubble.classList.remove("visible"), duration);
 };
 
-const setPetAction = (action: PetAction, duration = 900) => {
+const setPetAction = (action: PetAction, duration = 900, persistent = false) => {
   currentAction = action;
   petStage.dataset.action = action;
   const asset = selectedPet().skin.animations[action] ?? selectedPet().skin.animations.idle;
@@ -298,7 +319,7 @@ const setPetAction = (action: PetAction, duration = 900) => {
     petStage.dataset.sprite = "false";
   }
   if (actionTimer) window.clearTimeout(actionTimer);
-  if (action !== "idle" && action !== "run") {
+  if (action !== "idle" && action !== "run" && !persistent) {
     const assetDuration = asset && !asset.loop ? animationDurationMs(asset) : duration;
     actionTimer = window.setTimeout(() => setPetAction("idle", 0), assetDuration);
   }
@@ -379,6 +400,27 @@ const setPanelOpen = async (open: boolean) => {
   }
 };
 
+const showPersistentReminder = (message: string) => {
+  if (messageTimer) window.clearTimeout(messageTimer);
+  messageTimer = undefined;
+  speechMessage.textContent = message;
+  reminderAcknowledge.hidden = false;
+  speechBubble.classList.add("visible", "reminder");
+  speechBubble.setAttribute("role", "alert");
+  speechBubble.setAttribute("aria-live", "assertive");
+  setPetAction("remind", 0, true);
+  if (panelOpen) void setPanelOpen(false);
+};
+
+const revealPetForReminder = async () => {
+  await appWindow.show();
+  try {
+    await appWindow.unminimize();
+  } catch {
+    // Some window managers do not expose a minimized state for borderless windows.
+  }
+};
+
 const render = () => {
   const pet = selectedPet();
   const target = targetAmount();
@@ -414,7 +456,8 @@ const render = () => {
   document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
   document.documentElement.style.setProperty("--pet-size", `${state.petSize}px`);
   document.documentElement.style.setProperty("--pet-accent", pet.accent);
-  setPetAction(currentAction, 0);
+  petStage.dataset.species = pet.id === "alaskan" || pet.id === "shepherd" ? "dog" : "cat";
+  setPetAction(currentAction, 0, currentAction === "remind" && Boolean(activeReminder));
 };
 
 const notify = async (title: string, body: string) => {
@@ -466,25 +509,39 @@ const runReminderChecks = (now = Date.now()) => {
     hydrationDue = state.reminderValue === minuteKey.slice(-5) && state.lastHydrationReminderKey !== minuteKey;
     if (hydrationDue) state.lastHydrationReminderKey = minuteKey;
   }
-  if (hydrationDue) {
+  if (hydrationDue && !activeReminder) {
     state.lastHydrationReminderAt = now;
-    setPetAction("remind", 1800);
-    showMessage(t("messages.reminder"), 5000);
+    activeReminder = { kind: "hydration" };
+    void revealPetForReminder();
+    showPersistentReminder(t("messages.reminder"));
     void notify(t("actions.drink"), t("messages.notificationBody", { done: state.waterDone, target }));
+    saveState();
   }
 
-  let todoChanged = false;
-  for (const todo of state.todos) {
-    if (isTodoReminderDue(todo, now)) {
-      todo.notified = true;
-      todoChanged = true;
-      void appWindow.show();
-      setPetAction("remind", 1800);
-      showMessage(t("messages.todoReminder", { todo: todo.title }), 5000);
+  if (!activeReminder) {
+    const todo = findNextDueTodo(state.todos, now);
+    if (todo) {
+      activeReminder = { kind: "todo", todoId: todo.id };
+      void revealPetForReminder();
+      showPersistentReminder(t("messages.todoReminder", { todo: todo.title }));
       void notify(t("todo.notificationTitle"), todo.title);
     }
   }
-  if (hydrationDue || todoChanged) saveState();
+};
+
+const acknowledgeReminder = () => {
+  if (!activeReminder) return;
+  if (activeReminder.kind === "todo" && acknowledgeTodoReminder(state.todos, activeReminder.todoId)) {
+    saveState();
+    void emitTo("todo", todoEventName, state.todos);
+  }
+  activeReminder = undefined;
+  reminderAcknowledge.hidden = true;
+  speechBubble.classList.remove("visible", "reminder");
+  speechBubble.setAttribute("role", "status");
+  speechBubble.setAttribute("aria-live", "polite");
+  setPetAction("idle", 0);
+  runReminderChecks();
 };
 
 const updateAutostart = async (enabled: boolean) => {
@@ -506,6 +563,7 @@ byId("settings-button").addEventListener("click", () => void setPanelOpen(true))
 byId("context-settings-button").addEventListener("click", () => void setPanelOpen(true));
 byId("close-settings").addEventListener("click", () => void setPanelOpen(false));
 byId("quit-button").addEventListener("click", () => void invoke("quit_app"));
+reminderAcknowledge.addEventListener("click", acknowledgeReminder);
 byId("drink-button").addEventListener("click", () => recordWater(250));
 byId("panel-drink-button").addEventListener("click", () => recordWater(250));
 byId("feed-button").addEventListener("click", () => {

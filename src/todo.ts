@@ -10,6 +10,7 @@ import {
   normalizeTodo,
   saveTodos,
   todoEventName,
+  type Todo,
   type TodoPriority,
 } from "./todo-store";
 
@@ -189,6 +190,11 @@ void listen<string>("reminder-picker-confirm", ({ payload }) => {
   byId<HTMLInputElement>("todo-title").focus();
 });
 void listen("reminder-picker-cancel", () => byId<HTMLInputElement>("todo-title").focus());
+void listen<Todo[]>(todoEventName, ({ payload }) => {
+  todos = payload.map(normalizeTodo);
+  saveTodos(todos);
+  render();
+});
 byId("priority-button").addEventListener("click", () => {
   const current = byId<HTMLInputElement>("todo-priority").value as TodoPriority;
   updatePriorityButton(priorityOrder[(priorityOrder.indexOf(current) + 1) % priorityOrder.length]);
