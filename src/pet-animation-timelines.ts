@@ -19,8 +19,15 @@ const drinkTimeline = (): AnimationTimelineStep[] => [
   ...frames([8, 9, 10, 11, 12, 13, 14, 15], 90),
 ];
 
+const idleTimeline = (): AnimationTimelineStep[] => [
+  { frame: 0, durationMs: 4_200 },
+  ...frames([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 190),
+  { frame: 0, durationMs: 700 },
+];
+
 export const petActionTimelines: Record<string, ActionTimeline> = {
   alaskan: {
+    idle: idleTimeline(),
     drink: drinkTimeline(),
     feed: [
       ...frames([0, 1, 2, 3, 4, 5, 6, 7], 120),
@@ -29,6 +36,7 @@ export const petActionTimelines: Record<string, ActionTimeline> = {
     ],
   },
   shepherd: {
+    idle: idleTimeline(),
     drink: drinkTimeline(),
     feed: [
       ...frames([0, 1, 2, 3, 4, 5, 6], 120),
@@ -37,6 +45,7 @@ export const petActionTimelines: Record<string, ActionTimeline> = {
     ],
   },
   siamese: {
+    idle: idleTimeline(),
     drink: drinkTimeline(),
     feed: [
       ...frames([0, 1, 2, 3, 4], 130),
@@ -45,6 +54,7 @@ export const petActionTimelines: Record<string, ActionTimeline> = {
     ],
   },
   "maine-coon": {
+    idle: idleTimeline(),
     drink: drinkTimeline(),
     feed: [
       ...frames([0, 1, 2, 3, 4], 130),

@@ -354,9 +354,28 @@ test("feeding and drinking use per-pet enter-loop-exit timelines lasting at leas
   assert.match(player, /animationFrameAt\(asset, elapsedMs\)/);
 });
 
-test("pet sprite sheets use isolated 4 by 4 cells and higher frame rates", () => {
+test("idle animation leaves a long rest interval and keeps fallback breathing subtle", async () => {
+  const { petActionTimelines } = await importTypeScriptModule("src/pet-animation-timelines.ts");
+  const styles = read("src/styles.css");
+
+  for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
+    const idle = petActionTimelines[pet].idle;
+    const totalDuration = idle.reduce((total, step) => total + step.durationMs, 0);
+    const restingDuration = idle
+      .filter(({ frame }) => frame === 0)
+      .reduce((total, step) => total + step.durationMs, 0);
+    assert.ok(totalDuration >= 7_500, `${pet}/idle should use a calm cycle of at least 7.5 seconds`);
+    assert.ok(restingDuration >= 4_000, `${pet}/idle should remain still for at least 4 seconds per cycle`);
+    assert.ok(idle.filter(({ frame }) => frame !== 0).every(({ durationMs }) => durationMs >= 180), `${pet}/idle motion frames should not flicker rapidly`);
+  }
+  assert.match(styles, /animation: idle-breathe 8s/);
+  assert.match(styles, /translateY\(-1px\) scale\(1\.004\)/);
+  assert.doesNotMatch(styles, /translateY\(-2px\) scale\(1\.012\)/);
+});
+
+test("pet sprite sheets use isolated 4 by 4 cells and action-appropriate frame rates", () => {
   const main = read("src/main.ts");
-  assert.match(main, /idle: animationAsset\(id, "idle", 10, true\)/);
+  assert.match(main, /idle: animationAsset\(id, "idle", 8, true\)/);
   assert.match(main, /touch: animationAsset\(id, "touch", 16, false\)/);
   assert.match(main, /drink: animationAsset\(id, "drink", 16, false\)/);
   assert.match(main, /feed: animationAsset\(id, "feed", 16, false\)/);

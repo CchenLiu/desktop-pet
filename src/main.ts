@@ -88,7 +88,7 @@ const animationAsset = (id: string, action: PetAction, fps: number, loop: boolea
   edgeCleanup: id === "maine-coon" ? "green-fringe" : undefined,
 });
 const animatedSkin = (id: string) => skin(id, {
-  idle: animationAsset(id, "idle", 10, true),
+  idle: animationAsset(id, "idle", 8, true),
   touch: animationAsset(id, "touch", 16, false),
   drink: animationAsset(id, "drink", 16, false),
   feed: animationAsset(id, "feed", 16, false),

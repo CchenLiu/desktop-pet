@@ -59,7 +59,7 @@ svg { display: block; width: 1em; height: 1em; fill: none; stroke: currentColor;
 .pet-surface:active { cursor: grabbing; }
 .pet-image,
 .pet-sprite { position: relative; z-index: 2; display: block; width: var(--pet-size); height: var(--pet-size); pointer-events: none; transform-origin: 50% 96%; filter: drop-shadow(0 8px 7px rgba(57, 38, 28, 0.22)); }
-.pet-image { object-fit: contain; object-position: center bottom; animation: idle-breathe 3.4s cubic-bezier(.45, 0, .55, 1) infinite; }
+.pet-image { object-fit: contain; object-position: center bottom; animation: idle-breathe 8s cubic-bezier(.45, 0, .55, 1) infinite; }
 .pet-sprite { object-fit: contain; object-position: center bottom; }
 .pet-shadow { position: absolute; z-index: 0; bottom: -1px; width: calc(var(--pet-size) * .68); height: calc(var(--pet-size) * .105); border-radius: 50%; background: rgba(52, 38, 31, .2); filter: blur(5px); opacity: .72; }
 .pet-aura { position: absolute; z-index: 0; bottom: 4px; width: calc(var(--pet-size) * .9); height: calc(var(--pet-size) * .82); border-radius: 48%; background: color-mix(in srgb, var(--pet-accent) 18%, transparent); filter: blur(13px); opacity: 0; transition: opacity .24s ease; }
@@ -195,7 +195,7 @@ html[data-reduce-motion="true"] *::before,
 html[data-reduce-motion="true"] *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 
 @keyframes panel-in { from { opacity: 0; transform: translateY(7px) scale(.985); } to { opacity: 1; transform: none; } }
-@keyframes idle-breathe { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.012); } }
+@keyframes idle-breathe { 0%,56%,100% { transform: translateY(0) scale(1); } 72% { transform: translateY(-1px) scale(1.004); } 88% { transform: translateY(0) scale(1); } }
 @keyframes touch-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-4deg) translateY(-2px); } 60% { transform: rotate(4deg) translateY(-3px); } }
 @keyframes drink-nod { 0%,100% { transform: rotate(0); } 35%,65% { transform: translateY(3px) rotate(3deg); } }
 @keyframes feed-chew { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.96) translateY(2px); } }
