@@ -367,7 +367,8 @@ test("idle animation stays active with a short natural pause and blended frame t
     const restingDuration = idle
       .filter(({ frame }) => frame === 0)
       .reduce((total, step) => total + step.durationMs, 0);
-    assert.ok(totalDuration >= 2_800 && totalDuration <= 3_600, `${pet}/idle should keep moving without an extended freeze`);
+    const maximumDuration = pet === "shepherd" ? 4_500 : 3_600;
+    assert.ok(totalDuration >= 2_800 && totalDuration <= maximumDuration, `${pet}/idle should keep moving without an extended freeze`);
     assert.ok(restingDuration >= 500 && restingDuration <= 1_000, `${pet}/idle should use only a short natural pause`);
     assert.ok(idle.every(({ durationMs }) => durationMs >= 140), `${pet}/idle frames should not flicker rapidly`);
   }
@@ -419,6 +420,17 @@ test("problem animation sets keep stable frame maps and clean high-quality Maine
   assert.match(player, /asset\.frameMap\?\.\[targetFrame\] \?\? targetFrame/);
   assert.match(player, /cleanGreenFringe/);
   assert.match(player, /imageSmoothingQuality = "high"/);
+});
+
+test("German shepherd idle has its own goofy vacant stare and double-take rhythm", async () => {
+  const { petActionTimelines } = await importTypeScriptModule("src/pet-animation-timelines.ts");
+  const shepherdIdle = petActionTimelines.shepherd.idle;
+  const alaskanIdle = petActionTimelines.alaskan.idle;
+
+  assert.notDeepEqual(shepherdIdle, alaskanIdle);
+  assert.ok(shepherdIdle.some(({ frame, durationMs }) => frame === 9 && durationMs >= 320), "shepherd should linger on its vacant closed-eye frame");
+  assert.ok(shepherdIdle.filter(({ frame }) => frame === 14 || frame === 15).length >= 6, "shepherd should perform a silly late double-take");
+  assert.ok(shepherdIdle.reduce((total, step) => total + step.durationMs, 0) >= 4_000, "shepherd's goofy beat should have deliberate comic timing");
 });
 
 test("pet interaction separates a short touch from threshold-based dragging", () => {

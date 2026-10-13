@@ -24,6 +24,19 @@ const idleTimeline = (): AnimationTimelineStep[] => [
   { frame: 0, durationMs: 600 },
 ];
 
+const shepherdIdleTimeline = (): AnimationTimelineStep[] => [
+  { frame: 0, durationMs: 360 },
+  ...frames([1, 2, 3], 170),
+  ...frames([4, 5, 6, 7], 190),
+  { frame: 8, durationMs: 220 },
+  { frame: 9, durationMs: 360 },
+  { frame: 10, durationMs: 220 },
+  { frame: 11, durationMs: 180 },
+  ...frames([12, 13], 170),
+  ...repeat([14, 15], 3, 140),
+  { frame: 0, durationMs: 500 },
+];
+
 export const petActionTimelines: Record<string, ActionTimeline> = {
   alaskan: {
     idle: idleTimeline(),
@@ -35,7 +48,7 @@ export const petActionTimelines: Record<string, ActionTimeline> = {
     ],
   },
   shepherd: {
-    idle: idleTimeline(),
+    idle: shepherdIdleTimeline(),
     drink: drinkTimeline(),
     feed: [
       ...frames([0, 1, 2, 3, 4, 5, 6], 120),
