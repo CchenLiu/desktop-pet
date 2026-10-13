@@ -42,15 +42,16 @@
         "transparent": true,
         "backgroundColor": "#00000000",
         "shadow": false,
+        "alwaysOnTop": true,
         "visible": false
       },
       {
         "label": "reminder-picker",
         "title": "Reminder",
         "url": "reminder.html",
-        "width": 320,
+        "width": 368,
         "height": 380,
-        "minWidth": 320,
+        "minWidth": 368,
         "minHeight": 380,
         "resizable": false,
         "decorations": false,

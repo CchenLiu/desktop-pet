@@ -15,12 +15,20 @@ const localDateValue = (date: Date) => `${date.getFullYear()}-${pad2(date.getMon
 document.body.innerHTML = `
   <main class="picker-window" role="dialog" aria-label="${t("todo.calendarLabel")}">
     <header class="picker-header" data-tauri-drag-region>
-      <button id="calendar-previous" type="button" aria-label="${t("todo.previousMonth")}" title="${t("todo.previousMonth")}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+      <button id="reminder-cancel" class="picker-action cancel" type="button" aria-label="${t("todo.cancelReminder")}" title="${t("todo.cancelReminder")}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
       </button>
-      <strong id="calendar-month" data-tauri-drag-region></strong>
-      <button id="calendar-next" type="button" aria-label="${t("todo.nextMonth")}" title="${t("todo.nextMonth")}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+      <div class="month-control" data-tauri-drag-region>
+        <button id="calendar-previous" type="button" aria-label="${t("todo.previousMonth")}" title="${t("todo.previousMonth")}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+        </button>
+        <strong id="calendar-month" data-tauri-drag-region></strong>
+        <button id="calendar-next" type="button" aria-label="${t("todo.nextMonth")}" title="${t("todo.nextMonth")}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </button>
+      </div>
+      <button id="reminder-confirm" class="picker-action confirm" type="button" aria-label="${t("todo.confirmReminder")}" title="${t("todo.confirmReminder")}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
       </button>
     </header>
     <div id="calendar-weekdays" class="calendar-weekdays" aria-hidden="true"></div>
@@ -29,14 +37,6 @@ document.body.innerHTML = `
       <span>${t("todo.reminderDateTime")}</span>
       <input id="reminder-time" type="time" step="60" />
     </label>
-    <footer class="picker-actions">
-      <button id="reminder-cancel" class="picker-action cancel" type="button" aria-label="${t("todo.cancelReminder")}" title="${t("todo.cancelReminder")}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
-      </button>
-      <button id="reminder-confirm" class="picker-action confirm" type="button" aria-label="${t("todo.confirmReminder")}" title="${t("todo.confirmReminder")}">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
-      </button>
-    </footer>
   </main>
 `;
 

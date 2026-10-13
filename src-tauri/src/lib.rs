@@ -61,7 +61,13 @@ fn show_todo_window(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn show_reminder_picker(app: tauri::AppHandle, value: String) {
+fn show_reminder_picker(
+    app: tauri::AppHandle,
+    value: String,
+    anchor_x: f64,
+    anchor_top: f64,
+    anchor_bottom: f64,
+) {
     let (Some(picker), Some(todo)) = (
         app.get_webview_window("reminder-picker"),
         app.get_webview_window("todo"),
@@ -69,9 +75,8 @@ fn show_reminder_picker(app: tauri::AppHandle, value: String) {
         return;
     };
 
-    if let (Ok(todo_position), Ok(todo_size), Ok(picker_size), Ok(Some(monitor))) = (
+    if let (Ok(todo_position), Ok(picker_size), Ok(Some(monitor))) = (
         todo.outer_position(),
-        todo.outer_size(),
         picker.outer_size(),
         todo.current_monitor(),
     ) {
@@ -82,16 +87,23 @@ fn show_reminder_picker(app: tauri::AppHandle, value: String) {
         let work_bottom = work_top + work_area.size.height as i32;
         let picker_width = picker_size.width as i32;
         let picker_height = picker_size.height as i32;
-        let preferred_x = todo_position.x + todo_size.width as i32 - picker_width - 72;
-        let below_y = todo_position.y + todo_size.height as i32 + 6;
-        let above_y = todo_position.y - picker_height - 6;
+        let scale = todo.scale_factor().unwrap_or(1.0);
+        let anchor_screen_x = todo_position.x + (anchor_x * scale).round() as i32;
+        let anchor_screen_top = todo_position.y + (anchor_top * scale).round() as i32;
+        let anchor_screen_bottom = todo_position.y + (anchor_bottom * scale).round() as i32;
+        let top_gutter = (28.0 * scale).round() as i32;
+        let bottom_gutter = (36.0 * scale).round() as i32;
+        let gap = (4.0 * scale).round() as i32;
+        let preferred_x = anchor_screen_x - picker_width / 2;
+        let above_y = anchor_screen_top - gap - (picker_height - bottom_gutter);
+        let below_y = anchor_screen_bottom + gap - top_gutter;
         let max_x = (work_right - picker_width).max(work_left);
         let max_y = (work_bottom - picker_height).max(work_top);
         let x = preferred_x.clamp(work_left, max_x);
-        let y = if below_y + picker_height <= work_bottom {
-            below_y
-        } else if above_y >= work_top {
+        let y = if above_y >= work_top {
             above_y
+        } else if below_y + picker_height <= work_bottom {
+            below_y
         } else {
             below_y.clamp(work_top, max_y)
         };

@@ -175,7 +175,13 @@ const addTodo = () => {
 byId("add-todo").addEventListener("click", addTodo);
 byId("close-todo").addEventListener("click", closeTodoWindow);
 byId("reminder-button").addEventListener("click", () => {
-  void invoke("show_reminder_picker", { value: confirmedReminder });
+  const anchor = byId<HTMLButtonElement>("reminder-button").getBoundingClientRect();
+  void invoke("show_reminder_picker", {
+    value: confirmedReminder,
+    anchorX: anchor.left + anchor.width / 2,
+    anchorTop: anchor.top,
+    anchorBottom: anchor.bottom,
+  });
 });
 void listen<string>("reminder-picker-confirm", ({ payload }) => {
   confirmedReminder = payload;

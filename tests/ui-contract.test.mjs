@@ -118,15 +118,19 @@ test("todo reminder requires explicit confirmation and can be cancelled", () => 
   const zhCN = read("src/i18n/zh-CN.ts");
   const enUS = read("src/i18n/en-US.ts");
   const pickerWindow = config.app.windows.find(({ label }) => label === "reminder-picker");
+  const todoWindow = config.app.windows.find(({ label }) => label === "todo");
 
   assert.equal(pickerWindow.url, "reminder.html");
-  assert.ok(pickerWindow.width >= 300 && pickerWindow.width <= 340);
-  assert.ok(pickerWindow.height <= 380);
+  assert.ok(pickerWindow.width >= 350 && pickerWindow.width <= 380);
+  assert.ok(pickerWindow.height >= 370 && pickerWindow.height <= 390);
   assert.equal(pickerWindow.decorations, false);
   assert.equal(pickerWindow.transparent, true);
+  assert.equal(todoWindow.alwaysOnTop, true);
+  assert.equal(pickerWindow.alwaysOnTop, todoWindow.alwaysOnTop);
   assert.ok(capabilities.windows.includes("reminder-picker"));
   assert.match(vite, /reminder:.*reminder\.html/);
-  assert.match(todo, /invoke\("show_reminder_picker", \{ value: confirmedReminder \}\)/);
+  assert.match(todo, /getBoundingClientRect\(\)/);
+  assert.match(todo, /invoke\("show_reminder_picker", \{[\s\S]*?anchorX:[\s\S]*?anchorTop:[\s\S]*?anchorBottom:/);
   assert.match(todo, /listen<string>\("reminder-picker-confirm"/);
   assert.doesNotMatch(todo, /id="reminder-popover"/);
   assert.doesNotMatch(todo, /calendarOpen \? 420/);
@@ -137,9 +141,24 @@ test("todo reminder requires explicit confirmation and can be cancelled", () => 
   assert.match(picker, /id="reminder-time" type="time"/);
   assert.match(picker, /emitTo\("todo", "reminder-picker-confirm"/);
   assert.match(picker, /event\.key !== "Escape"/);
-  assert.match(styles, /\.picker-actions \{[^}]*justify-content: space-between;/);
+  const headerStart = picker.indexOf('<header class="picker-header"');
+  const headerEnd = picker.indexOf("</header>", headerStart);
+  const cancelButton = picker.indexOf('id="reminder-cancel"');
+  const confirmButton = picker.indexOf('id="reminder-confirm"');
+  assert.ok(cancelButton > headerStart && cancelButton < headerEnd);
+  assert.ok(confirmButton > headerStart && confirmButton < headerEnd);
+  assert.ok(cancelButton < confirmButton);
+  assert.doesNotMatch(picker, /<footer class="picker-actions">/);
+  assert.match(styles, /body \{[^}]*padding: 28px 28px 36px;/);
+  assert.match(styles, /\.picker-window \{[^}]*height: auto;/);
+  assert.match(styles, /\.picker-window \{[^}]*box-shadow: 0 14px 28px -14px/);
+  assert.doesNotMatch(styles, /0 16px 34px/);
   assert.match(rust, /fn show_reminder_picker/);
   assert.match(rust, /get_webview_window\("reminder-picker"\)/);
+  assert.match(rust, /anchor_x: f64/);
+  assert.match(rust, /anchor_top: f64/);
+  assert.match(rust, /anchor_bottom: f64/);
+  assert.match(rust, /todo_position\.x[\s\S]*anchor_x[\s\S]*scale/);
   assert.match(rust, /emit\("reminder-picker-open"/);
   assert.match(todo, /let confirmedReminder = ""/);
   assert.match(todo, /remindAt: confirmedReminder/);
@@ -147,6 +166,16 @@ test("todo reminder requires explicit confirmation and can be cancelled", () => 
   assert.match(zhCN, /cancelReminder: "取消本次设置"/);
   assert.match(enUS, /confirmReminder: "Confirm reminder time"/);
   assert.match(enUS, /cancelReminder: "Cancel this change"/);
+});
+
+test("always-on-top preference stays synchronized across pet, todo, and reminder windows", () => {
+  const main = read("src/main.ts");
+
+  assert.match(main, /getAllWindows/);
+  assert.match(main, /const syncAlwaysOnTop = async/);
+  assert.match(main, /\["main", "todo", "reminder-picker"\]/);
+  assert.match(main, /window\.setAlwaysOnTop\(alwaysOnTop\)/);
+  assert.match(main, /await syncAlwaysOnTop\(state\.alwaysOnTop\)/);
 });
 
 test("due todo reminders are checked immediately after sync and every second", () => {

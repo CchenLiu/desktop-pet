@@ -2,6 +2,7 @@ import "./styles.css";
 
 import {
   availableMonitors,
+  getAllWindows,
   getCurrentWindow,
   LogicalSize,
   PhysicalPosition,
@@ -103,6 +104,13 @@ const stateKey = "desktop-pet-state-v3";
 const legacyStateKey = "desktop-pet-state-v2";
 const oldestStateKey = "desktop-pet-state-v1";
 const appWindow = getCurrentWindow();
+const syncAlwaysOnTop = async (alwaysOnTop: boolean) => {
+  for (const window of await getAllWindows()) {
+    if (["main", "todo", "reminder-picker"].includes(window.label)) {
+      await window.setAlwaysOnTop(alwaysOnTop);
+    }
+  }
+};
 let reminderTimer: number | undefined;
 let actionTimer: number | undefined;
 let messageTimer: number | undefined;
@@ -578,7 +586,7 @@ byId<HTMLInputElement>("size-input").addEventListener("input", (event) => {
 byId<HTMLInputElement>("always-top-input").addEventListener("change", async (event) => {
   state.alwaysOnTop = (event.target as HTMLInputElement).checked;
   saveState();
-  await appWindow.setAlwaysOnTop(state.alwaysOnTop);
+  await syncAlwaysOnTop(state.alwaysOnTop);
 });
 byId<HTMLInputElement>("autostart-input").addEventListener("change", (event) => void updateAutostart((event.target as HTMLInputElement).checked));
 byId<HTMLInputElement>("reduce-motion-input").addEventListener("change", (event) => {
@@ -629,7 +637,7 @@ const bootstrap = async () => {
     runReminderChecks();
   });
   await appWindow.setTitle(t("app.title"));
-  await appWindow.setAlwaysOnTop(state.alwaysOnTop);
+  await syncAlwaysOnTop(state.alwaysOnTop);
   await appWindow.setSize(collapsedWindowSize());
   await restorePosition();
   try {
