@@ -2,7 +2,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconEvent},
-    Manager, RunEvent, WindowEvent,
+    Manager, WindowEvent,
 };
 
 mod locale;
@@ -21,19 +21,34 @@ fn show_todo_window(app: tauri::AppHandle) {
     }
 }
 
-fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+fn setup_tray(app: &tauri::App) {
     let tray_locale = locale::load();
-    let show = MenuItem::with_id(app, "show", &tray_locale.show, true, None::<&str>)?;
-    let hide = MenuItem::with_id(app, "hide", &tray_locale.hide, true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", &tray_locale.quit, true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &hide, &quit])?;
+    let Some(tray) = app.tray_by_id("desktop-pet-tray") else {
+        eprintln!("desktop pet tray setup failed: configured tray icon is missing");
+        return;
+    };
 
-    let tray = app
-        .tray_by_id("desktop-pet-tray")
-        .expect("configured desktop pet tray icon is missing");
-    tray.set_menu(Some(menu))?;
-    tray.set_tooltip(Some(&tray_locale.tooltip))?;
-    Ok(())
+    if let Err(error) = tray.set_visible(true) {
+        eprintln!("desktop pet tray visibility failed: {error}");
+    }
+    if let Err(error) = tray.set_tooltip(Some(&tray_locale.tooltip)) {
+        eprintln!("desktop pet tray tooltip failed: {error}");
+    }
+
+    let menu: tauri::Result<Menu<tauri::Wry>> = (|| {
+        let show = MenuItem::with_id(app, "show", &tray_locale.show, true, None::<&str>)?;
+        let hide = MenuItem::with_id(app, "hide", &tray_locale.hide, true, None::<&str>)?;
+        let quit = MenuItem::with_id(app, "quit", &tray_locale.quit, true, None::<&str>)?;
+        Menu::with_items(app, &[&show, &hide, &quit])
+    })();
+    match menu {
+        Ok(menu) => {
+            if let Err(error) = tray.set_menu(Some(menu)) {
+                eprintln!("desktop pet tray menu failed: {error}");
+            }
+        }
+        Err(error) => eprintln!("desktop pet tray menu creation failed: {error}"),
+    }
 }
 
 fn data_root_is_writable(path: &std::path::Path) -> bool {
@@ -94,9 +109,7 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
-            if let Err(error) = setup_tray(app) {
-                eprintln!("desktop pet tray setup failed: {error}");
-            }
+            setup_tray(app);
             Ok(())
         })
         .on_tray_icon_event(|app, event| {
@@ -112,9 +125,13 @@ pub fn run() {
                 }
             }
         })
-        .on_menu_event(|app, event| {
-            if let Some(window) = app.get_webview_window("main") {
-                match event.id.as_ref() {
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "quit" => app.exit(0),
+            action => {
+                let Some(window) = app.get_webview_window("main") else {
+                    return;
+                };
+                match action {
                     "show" => {
                         let _ = window.show();
                         let _ = window.set_focus();
@@ -122,7 +139,6 @@ pub fn run() {
                     "hide" => {
                         let _ = window.hide();
                     }
-                    "quit" => app.exit(0),
                     _ => {}
                 }
             }
@@ -136,9 +152,5 @@ pub fn run() {
         .build(context)
         .expect("error while building desktop pet");
 
-    app.run(|_, event| {
-        if let RunEvent::ExitRequested { api, .. } = event {
-            api.prevent_exit();
-        }
-    });
+    app.run(|_, _| {});
 }

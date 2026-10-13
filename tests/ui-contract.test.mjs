@@ -42,10 +42,10 @@ test("native tray has an explicit icon, left-click restore, and a registered qui
   assert.doesNotMatch(rust, /system tray is unavailable/);
   assert.match(rust, /TrayIconEvent::Click/);
   assert.match(rust, /MouseButton::Left/);
-  assert.match(rust, /RunEvent::ExitRequested/);
-  assert.match(rust, /api\.prevent_exit\(\)/);
   assert.match(rust, /fn quit_app/);
   assert.match(rust, /generate_handler!\[[^\]]*quit_app/);
+  assert.doesNotMatch(rust, /RunEvent::ExitRequested/);
+  assert.doesNotMatch(rust, /api\.prevent_exit\(\)/);
   assert.match(cargo, /"image-png"/);
 });
 
@@ -208,7 +208,8 @@ test("startup probes writable data fallbacks and tray setup cannot abort the app
   assert.match(rust, /current_exe\(\)/);
   assert.match(rust, /\.desktop-pet-data/);
   assert.match(rust, /OpenOptions::new\(\)/);
-  assert.match(rust, /if let Err\(error\) = setup_tray\(app\)/);
+  assert.match(rust, /if let Err\(error\) = tray\.set_visible\(true\)/);
+  assert.match(rust, /if let Err\(error\) = tray\.set_menu\(Some\(menu\)\)/);
   assert.doesNotMatch(rust, /setup_tray\(app\)\?;/);
-  assert.doesNotMatch(rust, /tray\.set_visible\(true\)\?/);
+  assert.doesNotMatch(rust, /tray\.set_menu\(Some\(menu\)\)\?/);
 });
