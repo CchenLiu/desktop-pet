@@ -1,6 +1,6 @@
 import "./todo.css";
 
-import { emitTo } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getLocale, t } from "./i18n";
 import {
@@ -142,6 +142,14 @@ const addTodo = () => {
 
 byId("add-todo").addEventListener("click", addTodo);
 byId("close-todo").addEventListener("click", () => void todoWindow.hide());
+void listen<string>("todo-window-open", ({ payload }) => {
+  document.body.dataset.openDirection = payload === "left" ? "left" : "right";
+  const windowSurface = document.querySelector<HTMLElement>(".todo-window");
+  if (!windowSurface) return;
+  windowSurface.classList.remove("entering");
+  void windowSurface.offsetWidth;
+  windowSurface.classList.add("entering");
+});
 byId<HTMLInputElement>("todo-title").addEventListener("keydown", (event) => {
   if (event.key === "Enter") addTodo();
 });

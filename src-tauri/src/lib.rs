@@ -3,7 +3,7 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
+    Emitter, Manager, PhysicalPosition, WindowEvent,
 };
 
 mod locale;
@@ -15,11 +15,49 @@ fn quit_app(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn show_todo_window(app: tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("todo") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+    let (Some(todo), Some(pet)) = (
+        app.get_webview_window("todo"),
+        app.get_webview_window("main"),
+    ) else {
+        return;
+    };
+
+    let mut direction = "right";
+    if let (Ok(pet_position), Ok(pet_size), Ok(todo_size), Ok(Some(monitor))) = (
+        pet.outer_position(),
+        pet.outer_size(),
+        todo.outer_size(),
+        pet.current_monitor(),
+    ) {
+        let work_area = monitor.work_area();
+        let work_left = work_area.position.x;
+        let work_top = work_area.position.y;
+        let work_right = work_left + work_area.size.width as i32;
+        let work_bottom = work_top + work_area.size.height as i32;
+        let todo_width = todo_size.width as i32;
+        let todo_height = todo_size.height as i32;
+        let gap = 12;
+        let right_x = pet_position.x + pet_size.width as i32 + gap;
+        let left_x = pet_position.x - todo_width - gap;
+        let max_x = (work_right - todo_width).max(work_left);
+        let x = if right_x + todo_width <= work_right {
+            right_x
+        } else if left_x >= work_left {
+            direction = "left";
+            left_x
+        } else {
+            right_x.clamp(work_left, max_x)
+        };
+        let max_y = (work_bottom - todo_height).max(work_top);
+        let centered_y = pet_position.y + (pet_size.height as i32 - todo_height) / 2;
+        let y = centered_y.clamp(work_top, max_y);
+        let _ = todo.set_position(PhysicalPosition::new(x, y));
     }
+
+    let _ = todo.unminimize();
+    let _ = todo.show();
+    let _ = todo.emit("todo-window-open", direction);
+    let _ = todo.set_focus();
 }
 
 fn setup_tray(app: &tauri::AppHandle) {

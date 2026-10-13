@@ -58,8 +58,9 @@ test("todo window is compact, frameless, transparent, and has an in-app close co
   const todo = read("src/todo.ts");
   const styles = read("src/todo.css");
 
-  assert.equal(todoWindow.width, 476);
-  assert.ok(todoWindow.height <= 660);
+  assert.ok(todoWindow.width <= 420);
+  assert.ok(todoWindow.height <= 500);
+  assert.notEqual(todoWindow.center, true);
   assert.equal(todoWindow.resizable, false);
   assert.equal(todoWindow.decorations, false);
   assert.equal(todoWindow.transparent, true);
@@ -68,7 +69,22 @@ test("todo window is compact, frameless, transparent, and has an in-app close co
   assert.match(todo, /data-tauri-drag-region/);
   assert.match(todo, /id="close-todo"/);
   assert.match(todo, /todoWindow\.hide\(\)/);
+  assert.match(todo, /listen<string>\("todo-window-open"/);
   assert.match(styles, /\.todo-window\s*\{/);
+  assert.match(styles, /@keyframes todo-slide-(?:left|right)/);
+  assert.match(styles, /body \{[^}]*padding: 24px;/);
+});
+
+test("todo window opens beside the pet and stays inside the current monitor work area", () => {
+  const rust = read("src-tauri/src/lib.rs");
+
+  assert.match(rust, /get_webview_window\("main"\)/);
+  assert.match(rust, /outer_position\(\)/);
+  assert.match(rust, /outer_size\(\)/);
+  assert.match(rust, /current_monitor\(\)/);
+  assert.match(rust, /work_area\(\)/);
+  assert.match(rust, /set_position\(PhysicalPosition::new/);
+  assert.match(rust, /emit\("todo-window-open"/);
 });
 
 test("settings supporting text is at least eleven pixels", () => {
