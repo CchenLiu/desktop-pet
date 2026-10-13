@@ -40,11 +40,21 @@ body[data-open-direction="left"] .todo-window.entering { animation-name: todo-sl
 .todo-input:hover { border-color: rgba(73,58,45,.22); background: #fff; }
 .todo-input[aria-invalid="true"] { border-color: var(--urgent); }
 .compact-control { position: relative; width: 34px; height: 34px; }
+.reminder-control.is-editing { z-index: 2; }
 .native-datetime { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .compact-control-button { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.75); color: var(--muted); transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease; }
 .compact-control-button:hover { border-color: rgba(111,125,98,.3); background: #fff; color: var(--ink); transform: translateY(-1px); }
 .compact-control-button svg { width: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 #reminder-button[data-active="true"] { border-color: rgba(111,125,98,.3); background: #e5e9df; color: #536048; }
+.reminder-actions { position: absolute; top: 0; left: 0; display: grid; width: 75px; height: 34px; grid-template-columns: 1fr 1fr; gap: 7px; padding-right: 0; border-radius: 9px; background: #fffcf6; box-shadow: 0 4px 12px rgba(67,44,31,.12); }
+.reminder-action { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: #fff; transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease; }
+.reminder-action:hover { transform: translateY(-1px); }
+.reminder-action:active { transform: scale(.94); }
+.reminder-action svg { width: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.reminder-action.confirm { border-color: rgba(111,125,98,.3); background: #e5e9df; color: #536048; }
+.reminder-action.confirm:hover { background: #d9e0d1; }
+.reminder-action.cancel { color: #8f8178; }
+.reminder-action.cancel:hover { border-color: rgba(196,84,73,.28); background: #fae0dc; color: var(--urgent); }
 #priority-button[data-priority="important"] { border-color: rgba(217,156,43,.35); background: #fff0c9; color: #986515; }
 #priority-button[data-priority="urgent"] { border-color: rgba(196,84,73,.32); background: #fae0dc; color: #9f3f36; }
 .add-todo { display: inline-flex; min-height: 36px; align-items: center; gap: 5px; padding: 0 12px; border-radius: 9px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 650; white-space: nowrap; transition: transform .18s ease, background .18s ease; }

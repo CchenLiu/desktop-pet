@@ -75,6 +75,8 @@ const zhCN = {
     filterActive: "待完成",
     filterDone: "已完成",
     remindAt: "提醒时间（可不填）",
+    confirmReminder: "确认提醒时间",
+    cancelReminder: "取消本次设置",
     noReminder: "无提醒",
     delete: "删除待办",
     priority: "重要程度",

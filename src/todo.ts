@@ -17,6 +17,7 @@ type TodoFilter = "all" | "active" | "done";
 const priorityOrder: TodoPriority[] = ["normal", "important", "urgent"];
 let todos = loadTodos();
 let activeFilter: TodoFilter = "all";
+let confirmedReminder = "";
 const todoWindow = getCurrentWindow();
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({
@@ -52,11 +53,19 @@ document.body.innerHTML = `
           <label class="sr-only" for="todo-title">${t("todo.placeholder")}</label>
           <input id="todo-title" class="todo-input" placeholder="${t("todo.placeholder")}" autocomplete="off" />
 
-          <div class="compact-control">
+          <div id="reminder-control" class="compact-control reminder-control">
             <input id="todo-reminder" class="native-datetime" type="datetime-local" tabindex="-1" aria-hidden="true" />
             <button id="reminder-button" class="compact-control-button" type="button" aria-label="${t("todo.remindAt")}" title="${t("todo.remindAt")}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" /></svg>
             </button>
+            <div class="reminder-actions" hidden>
+              <button id="reminder-confirm" class="reminder-action confirm" type="button" aria-label="${t("todo.confirmReminder")}" title="${t("todo.confirmReminder")}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
+              </button>
+              <button id="reminder-cancel" class="reminder-action cancel" type="button" aria-label="${t("todo.cancelReminder")}" title="${t("todo.cancelReminder")}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>
+              </button>
+            </div>
           </div>
 
           <input id="todo-priority" type="hidden" value="normal" />
@@ -101,11 +110,17 @@ const updatePriorityButton = (priority: TodoPriority) => {
 };
 
 const updateReminderButton = () => {
-  const reminder = byId<HTMLInputElement>("todo-reminder").value;
   const button = byId<HTMLButtonElement>("reminder-button");
-  button.dataset.active = String(Boolean(reminder));
-  button.title = reminder ? formatReminder(reminder) : t("todo.remindAt");
+  button.dataset.active = String(Boolean(confirmedReminder));
+  button.title = confirmedReminder ? formatReminder(confirmedReminder) : t("todo.remindAt");
   button.setAttribute("aria-label", button.title);
+};
+
+const setReminderEditing = (editing: boolean) => {
+  const control = byId<HTMLElement>("reminder-control");
+  control.classList.toggle("is-editing", editing);
+  byId<HTMLButtonElement>("reminder-button").hidden = editing;
+  control.querySelector<HTMLElement>(".reminder-actions")!.hidden = !editing;
 };
 
 const render = () => {
@@ -151,11 +166,13 @@ const addTodo = () => {
   todos.unshift(normalizeTodo({
     id: crypto.randomUUID(),
     title,
-    remindAt: byId<HTMLInputElement>("todo-reminder").value,
+    remindAt: confirmedReminder,
     priority: byId<HTMLInputElement>("todo-priority").value as TodoPriority,
   }));
   titleInput.value = "";
+  confirmedReminder = "";
   byId<HTMLInputElement>("todo-reminder").value = "";
+  setReminderEditing(false);
   updateReminderButton();
   updatePriorityButton("normal");
   persist();
@@ -167,10 +184,23 @@ byId("add-todo").addEventListener("click", addTodo);
 byId("close-todo").addEventListener("click", () => void todoWindow.hide());
 byId("reminder-button").addEventListener("click", () => {
   const input = byId<HTMLInputElement>("todo-reminder");
+  input.value = confirmedReminder;
+  setReminderEditing(true);
   if (typeof input.showPicker === "function") input.showPicker();
   else input.click();
 });
-byId("todo-reminder").addEventListener("change", updateReminderButton);
+byId("reminder-confirm").addEventListener("click", () => {
+  const input = byId<HTMLInputElement>("todo-reminder");
+  confirmedReminder = input.value;
+  setReminderEditing(false);
+  updateReminderButton();
+});
+byId("reminder-cancel").addEventListener("click", () => {
+  const input = byId<HTMLInputElement>("todo-reminder");
+  input.value = confirmedReminder;
+  setReminderEditing(false);
+  updateReminderButton();
+});
 byId("priority-button").addEventListener("click", () => {
   const current = byId<HTMLInputElement>("todo-priority").value as TodoPriority;
   updatePriorityButton(priorityOrder[(priorityOrder.indexOf(current) + 1) % priorityOrder.length]);

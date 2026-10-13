@@ -84,6 +84,25 @@ test("todo window is compact, frameless, transparent, and has an in-app close co
   assert.match(styles, /\.composer-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) 34px 34px auto;/);
 });
 
+test("todo reminder requires explicit confirmation and can be cancelled", () => {
+  const todo = read("src/todo.ts");
+  const styles = read("src/todo.css");
+  const zhCN = read("src/i18n/zh-CN.ts");
+  const enUS = read("src/i18n/en-US.ts");
+
+  assert.match(todo, /id="reminder-confirm"/);
+  assert.match(todo, /id="reminder-cancel"/);
+  assert.match(todo, /let confirmedReminder = ""/);
+  assert.match(todo, /confirmedReminder = input\.value/);
+  assert.match(todo, /input\.value = confirmedReminder/);
+  assert.match(todo, /remindAt: confirmedReminder/);
+  assert.match(styles, /\.reminder-actions/);
+  assert.match(zhCN, /confirmReminder: "确认提醒时间"/);
+  assert.match(zhCN, /cancelReminder: "取消本次设置"/);
+  assert.match(enUS, /confirmReminder: "Confirm reminder time"/);
+  assert.match(enUS, /cancelReminder: "Cancel this change"/);
+});
+
 test("todo window opens beside the pet and stays inside the current monitor work area", () => {
   const rust = read("src-tauri/src/lib.rs");
 

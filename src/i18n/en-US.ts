@@ -75,6 +75,8 @@ const enUS = {
     filterActive: "Active",
     filterDone: "Done",
     remindAt: "Reminder time (optional)",
+    confirmReminder: "Confirm reminder time",
+    cancelReminder: "Cancel this change",
     noReminder: "No reminder",
     delete: "Delete Todo",
     priority: "Priority",
