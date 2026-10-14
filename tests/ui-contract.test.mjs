@@ -305,13 +305,62 @@ test("hydration feedback reports amount, total, target, and remaining water", ()
   const zh = read("src/i18n/zh-CN.ts");
   const en = read("src/i18n/en-US.ts");
 
-  assert.match(main, /state\.waterDone \+= amount/);
+  assert.match(main, /state\.waterDone \+= recordedAmount/);
   assert.match(main, /remaining = Math\.max\(0, target - state\.waterDone\)/);
   for (const locale of [zh, en]) {
     assert.match(locale, /hydrationRecorded:.*\{\{amount\}\}/);
     assert.match(locale, /hydrationRecorded:.*\{\{done\}\}/);
     assert.match(locale, /hydrationRecorded:.*\{\{target\}\}/);
     assert.match(locale, /hydrationRecorded:.*\{\{remaining\}\}/);
+  }
+});
+
+test("hydration plan distributes the daily target across work-hour reminder slots", async () => {
+  const { buildHydrationPlan, intervalReminderSlotKey } = await importTypeScriptModule("src/hydration-plan.ts");
+  const main = read("src/main.ts");
+  const zh = read("src/i18n/zh-CN.ts");
+  const en = read("src/i18n/en-US.ts");
+  const morning = new Date(2026, 9, 14, 9, 0, 0);
+  const midday = new Date(2026, 9, 14, 12, 0, 0);
+
+  const initial = buildHydrationPlan({
+    target: 1500,
+    completed: 0,
+    intervalMinutes: 30,
+    workStart: "09:00",
+    workEnd: "18:00",
+    now: morning,
+  });
+  assert.equal(initial.totalSlots, 18);
+  assert.equal(initial.remainingSlots, 18);
+  assert.equal(initial.recommendedAmount, 90);
+
+  const behindSchedule = buildHydrationPlan({
+    target: 1500,
+    completed: 180,
+    intervalMinutes: 30,
+    workStart: "09:00",
+    workEnd: "18:00",
+    now: midday,
+  });
+  assert.equal(behindSchedule.remainingSlots, 13);
+  assert.equal(behindSchedule.recommendedAmount, 110);
+
+  assert.equal(intervalReminderSlotKey(new Date(2026, 9, 14, 8, 59), "09:00", "18:00", 30), "");
+  assert.equal(intervalReminderSlotKey(new Date(2026, 9, 14, 9, 30), "09:00", "18:00", 30), "2026-10-14-09:30");
+  assert.equal(intervalReminderSlotKey(new Date(2026, 9, 14, 10, 1), "09:00", "18:00", 30), "2026-10-14-10:00");
+  assert.equal(intervalReminderSlotKey(new Date(2026, 9, 14, 18, 1), "09:00", "18:00", 30), "");
+
+  assert.match(main, /workStart: "09:00"/);
+  assert.match(main, /workEnd: "18:00"/);
+  assert.match(main, /id="work-start-input" type="time"/);
+  assert.match(main, /id="work-end-input" type="time"/);
+  assert.match(main, /const amount = recommendedHydrationAmount\(\)/);
+  assert.doesNotMatch(main, /recordWater\(250\)/);
+  for (const locale of [zh, en]) {
+    assert.match(locale, /workStart:/);
+    assert.match(locale, /workEnd:/);
+    assert.match(locale, /drinkAmount:/);
   }
 });
 

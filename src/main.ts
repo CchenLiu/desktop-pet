@@ -21,6 +21,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getLocale, localeOptions, setLocale, t, type Locale } from "./i18n";
+import { buildHydrationPlan, intervalReminderSlotKey } from "./hydration-plan";
 import { petActionTimelines } from "./pet-animation-timelines";
 import { animationDurationMs, type PetAction, type PetAnimationAsset, type PetSkinManifest } from "./pet-skin";
 import { acknowledgeTodoReminder, findNextDueTodo, migrateTodoAcknowledgements } from "./reminder-engine";
@@ -55,6 +56,8 @@ type AppState = {
   waterDate: string;
   reminderMode: ReminderMode;
   reminderValue: string;
+  workStart: string;
+  workEnd: string;
   lastHydrationReminderAt: number;
   lastHydrationReminderKey: string;
   reminderAcknowledgementVersion: number;
@@ -145,6 +148,8 @@ const defaultState = (): AppState => ({
   waterDate: localDateKey(),
   reminderMode: "interval",
   reminderValue: "60",
+  workStart: "09:00",
+  workEnd: "18:00",
   lastHydrationReminderAt: Date.now(),
   lastHydrationReminderKey: "",
   reminderAcknowledgementVersion: 1,
@@ -236,13 +241,15 @@ document.body.innerHTML = `
         <section class="hydration-card">
           <div class="section-heading"><div><span class="eyebrow">${t("hydration.eyebrow")}</span><h2>${t("hydration.title")}</h2></div><strong class="metric" id="water-label"></strong></div>
           <div class="progress-track"><div class="progress-value" id="water-progress"></div></div>
-          <div class="progress-foot"><span id="water-remaining"></span><button class="primary-button" id="panel-drink-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4s5 5.7 5 10a5 5 0 1 1-10 0c0-4.3 5-10 5-10Z"/></svg>${t("actions.drink")}</button></div>
+          <div class="progress-foot"><span id="water-remaining"></span><button class="primary-button" id="panel-drink-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4s5 5.7 5 10a5 5 0 1 1-10 0c0-4.3 5-10 5-10Z"/></svg><span id="panel-drink-label"></span></button></div>
           <div class="form-grid hydration-options">
             <div><label class="field-label" for="target-mode-input">${t("hydration.targetMode")}</label><select class="field" id="target-mode-input"><option value="guideline">${t("hydration.guidelineMode")}</option><option value="custom">${t("hydration.customMode")}</option></select></div>
             <div id="guideline-fields"><label class="field-label" for="guideline-profile-input">${t("hydration.guidelineProfile")}</label><select class="field" id="guideline-profile-input"><option value="female">${t("hydration.adultFemale")}</option><option value="male">${t("hydration.adultMale")}</option></select></div>
             <div id="custom-target-fields"><label class="field-label" for="target-input">${t("hydration.dailyTarget")}</label><input class="field" id="target-input" type="number" min="200" max="5000" step="50" /></div>
             <div><label class="field-label" for="reminder-mode-input">${t("reminders.mode")}</label><select class="field" id="reminder-mode-input"><option value="interval">${t("reminders.intervalOption")}</option><option value="fixed">${t("reminders.fixedOption")}</option></select></div>
             <div><label class="field-label" for="reminder-value-input" id="reminder-value-label"></label><input class="field" id="reminder-value-input" /></div>
+            <div><label class="field-label" for="work-start-input">${t("hydration.workStart")}</label><input class="field" id="work-start-input" type="time" /></div>
+            <div><label class="field-label" for="work-end-input">${t("hydration.workEnd")}</label><input class="field" id="work-end-input" type="time" /></div>
           </div>
           <p class="panel-tip">${t("hydration.guidelineHint")}</p>
         </section>
@@ -450,11 +457,20 @@ const render = () => {
   reminderInput.max = state.reminderMode === "interval" ? "360" : "";
   reminderInput.step = state.reminderMode === "interval" ? "15" : "60";
   reminderInput.value = state.reminderValue;
+  byId<HTMLInputElement>("work-start-input").value = state.workStart;
+  byId<HTMLInputElement>("work-end-input").value = state.workEnd;
   byId<HTMLElement>("reminder-value-label").textContent = state.reminderMode === "interval" ? t("reminders.intervalLabel") : t("reminders.fixedLabel");
   byId<HTMLSelectElement>("language-input").value = getLocale();
   byId<HTMLElement>("water-label").textContent = `${state.waterDone} / ${target} ml`;
   byId<HTMLElement>("water-progress").style.width = `${progress}%`;
   byId<HTMLElement>("water-remaining").textContent = state.waterDone >= target ? t("hydration.goalDone") : t("hydration.remaining", { amount: Math.max(0, target - state.waterDone) });
+  const drinkAmount = recommendedHydrationAmount();
+  const drinkLabel = t("hydration.drinkAmount", { amount: drinkAmount });
+  byId<HTMLElement>("panel-drink-label").textContent = drinkLabel;
+  byId<HTMLButtonElement>("panel-drink-button").disabled = drinkAmount === 0;
+  byId<HTMLButtonElement>("drink-button").disabled = drinkAmount === 0;
+  byId<HTMLButtonElement>("drink-button").setAttribute("aria-label", drinkLabel);
+  byId<HTMLButtonElement>("drink-button").dataset.tooltip = drinkLabel;
   document.documentElement.dataset.reduceMotion = state.reduceMotion ? "true" : "false";
   document.documentElement.style.setProperty("--pet-size", `${state.petSize}px`);
   document.documentElement.style.setProperty("--pet-accent", pet.accent);
@@ -481,17 +497,32 @@ const resetWaterForNewDay = () => {
   saveState();
 };
 
+const recommendedHydrationAmount = (now = new Date()) => {
+  const target = targetAmount();
+  if (state.reminderMode !== "interval") return Math.min(250, Math.max(0, target - state.waterDone));
+  return buildHydrationPlan({
+    target,
+    completed: state.waterDone,
+    intervalMinutes: Number(state.reminderValue) || 60,
+    workStart: state.workStart,
+    workEnd: state.workEnd,
+    now,
+  }).recommendedAmount;
+};
+
 const recordWater = (amount: number) => {
   resetWaterForNewDay();
   const target = targetAmount();
   const wasComplete = state.waterDone >= target;
-  state.waterDone += amount;
+  const recordedAmount = Math.min(Math.max(0, amount), Math.max(0, target - state.waterDone));
+  if (recordedAmount === 0) return;
+  state.waterDone += recordedAmount;
   saveState();
   render();
   setPetAction(state.waterDone >= target && !wasComplete ? "happy" : "drink", 1200);
   const remaining = Math.max(0, target - state.waterDone);
   showMessage(t(state.waterDone >= target ? "messages.hydrationGoalDone" : "messages.hydrationRecorded", {
-    amount,
+    amount: recordedAmount,
     done: state.waterDone,
     remaining,
     target,
@@ -503,20 +534,24 @@ const runReminderChecks = (now = Date.now()) => {
   const nowDate = new Date(now);
   const target = targetAmount();
   let hydrationDue = false;
+  let hydrationReminderKey = "";
   if (state.waterDone < target && state.reminderMode === "interval") {
     const intervalMinutes = Math.max(15, Number(state.reminderValue) || 60);
-    hydrationDue = now - state.lastHydrationReminderAt >= intervalMinutes * 60_000;
+    hydrationReminderKey = intervalReminderSlotKey(nowDate, state.workStart, state.workEnd, intervalMinutes);
+    hydrationDue = Boolean(hydrationReminderKey) && state.lastHydrationReminderKey !== hydrationReminderKey;
   } else if (state.waterDone < target) {
     const minuteKey = `${localDateKey(nowDate)}-${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`;
     hydrationDue = state.reminderValue === minuteKey.slice(-5) && state.lastHydrationReminderKey !== minuteKey;
-    if (hydrationDue) state.lastHydrationReminderKey = minuteKey;
+    hydrationReminderKey = minuteKey;
   }
   if (hydrationDue && !activeReminder) {
+    state.lastHydrationReminderKey = hydrationReminderKey;
     state.lastHydrationReminderAt = now;
     activeReminder = { kind: "hydration" };
     void revealPetForReminder();
-    showPersistentReminder(t("messages.reminder"));
-    void notify(t("actions.drink"), t("messages.notificationBody", { done: state.waterDone, target }));
+    const amount = recommendedHydrationAmount(nowDate);
+    showPersistentReminder(t("messages.reminder", { amount }));
+    void notify(t("actions.drink"), t("messages.notificationBody", { amount, done: state.waterDone, target }));
     saveState();
   }
 
@@ -566,8 +601,14 @@ byId("context-settings-button").addEventListener("click", () => void setPanelOpe
 byId("close-settings").addEventListener("click", () => void setPanelOpen(false));
 byId("quit-button").addEventListener("click", () => void invoke("quit_app"));
 reminderAcknowledge.addEventListener("click", acknowledgeReminder);
-byId("drink-button").addEventListener("click", () => recordWater(250));
-byId("panel-drink-button").addEventListener("click", () => recordWater(250));
+byId("drink-button").addEventListener("click", () => {
+  const amount = recommendedHydrationAmount();
+  recordWater(amount);
+});
+byId("panel-drink-button").addEventListener("click", () => {
+  const amount = recommendedHydrationAmount();
+  recordWater(amount);
+});
 byId("feed-button").addEventListener("click", () => {
   setPetAction("feed", 1200);
   showMessage(t("messages.feed"));
@@ -688,8 +729,18 @@ byId<HTMLSelectElement>("reminder-mode-input").addEventListener("change", (event
 byId<HTMLInputElement>("reminder-value-input").addEventListener("change", (event) => {
   state.reminderValue = (event.target as HTMLInputElement).value;
   state.lastHydrationReminderAt = Date.now();
+  state.lastHydrationReminderKey = "";
   saveState();
+  render();
 });
+for (const [id, key] of [["work-start-input", "workStart"], ["work-end-input", "workEnd"]] as const) {
+  byId<HTMLInputElement>(id).addEventListener("change", (event) => {
+    state[key] = (event.target as HTMLInputElement).value || (key === "workStart" ? "09:00" : "18:00");
+    state.lastHydrationReminderKey = "";
+    saveState();
+    render();
+  });
+}
 const bootstrap = async () => {
   render();
   preloadPetAnimations(selectedPet());
