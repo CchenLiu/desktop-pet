@@ -1,6 +1,6 @@
 [package]
 name = "desktop-pet"
-version = "0.1.0"
+version = "0.0.1"
 description = "A lightweight Windows desktop pet"
 authors = ["Desktop Pet"]
 edition = "2021"

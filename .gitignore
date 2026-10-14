@@ -2,6 +2,7 @@ node_modules/
 dist/
 .tauri/
 src-tauri/target/
+release/
 .cargo-mirror/
 .tmp/
 src-tauri/gen/
