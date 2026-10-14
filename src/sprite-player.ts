@@ -51,7 +51,13 @@ export class SpritePlayer {
     if (cached) return cached;
     const pending = new Promise<SpriteSheet>((resolve, reject) => {
       const image = new Image();
-      image.onload = () => resolve(edgeCleanup === "green-fringe" ? this.cleanGreenFringe(image) : image);
+      image.onload = () => resolve(
+        edgeCleanup === "green-fringe"
+          ? this.cleanGreenFringe(image)
+          : edgeCleanup === "generated-fringe"
+            ? this.cleanGeneratedFringe(image)
+            : image,
+      );
       image.onerror = () => reject(new Error(`Unable to load sprite sheet: ${src}`));
       image.src = src;
     });
@@ -84,6 +90,29 @@ export class SpritePlayer {
           if (alpha < 112) data[offset + 3] = Math.round(alpha * 0.72);
         }
       }
+    }
+    context.putImageData(pixels, 0, 0);
+    return canvas;
+  }
+
+  private cleanGeneratedFringe(image: HTMLImageElement) {
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return image;
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = pixels;
+    for (let offset = 0; offset < data.length; offset += 4) {
+      if (data[offset + 3] === 0) continue;
+      const red = data[offset];
+      const green = data[offset + 1];
+      const blue = data[offset + 2];
+      const neonRed = red > 225 && green < 95 && blue < 95;
+      const neonYellow = red > 225 && green > 175 && blue < 85;
+      const neonGreen = green > 215 && red < 135 && blue < 135;
+      if (neonRed || neonYellow || neonGreen) data[offset + 3] = 0;
     }
     context.putImageData(pixels, 0, 0);
     return canvas;

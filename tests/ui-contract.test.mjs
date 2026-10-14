@@ -222,11 +222,13 @@ test("todo due-time predicate handles due, future, completed, and notified tasks
   assert.equal(migrateTodoAcknowledgements([{ ...todo, notified: true }], 1)[0].notified, true);
 });
 
-test("pet reminders stay visible until acknowledged and use species-specific call motion", () => {
+test("pet reminders stay visible until acknowledged and use per-pet call sprite frames", async () => {
   const main = read("src/main.ts");
   const styles = read("src/styles.css");
+  const player = read("src/sprite-player.ts");
   const zh = read("src/i18n/zh-CN.ts");
   const en = read("src/i18n/en-US.ts");
+  const { petActionTimelines } = await importTypeScriptModule("src/pet-animation-timelines.ts");
 
   assert.match(main, /id="reminder-acknowledge"/);
   assert.match(main, /const showPersistentReminder =/);
@@ -235,13 +237,23 @@ test("pet reminders stay visible until acknowledged and use species-specific cal
   assert.match(main, /acknowledgeTodoReminder\(state\.todos, activeReminder\.todoId\)/);
   assert.match(main, /migrateTodoAcknowledgements\([\s\S]*?stored\.reminderAcknowledgementVersion/);
   assert.doesNotMatch(main, /if \(isTodoReminderDue\(todo, now\)\) \{[\s\S]*?todo\.notified = true/);
-  assert.match(main, /petStage\.dataset\.species = pet\.id === "alaskan" \|\| pet\.id === "shepherd" \? "dog" : "cat"/);
-  assert.match(styles, /data-action="remind"\]\[data-species="dog"\] \.pet-sprite/);
-  assert.match(styles, /data-action="remind"\]\[data-species="cat"\] \.pet-sprite/);
-  assert.match(styles, /@keyframes dog-alert-hop/);
-  assert.match(styles, /@keyframes cat-alert-hop/);
-  assert.doesNotMatch(styles, /@keyframes dog-bark/);
-  assert.doesNotMatch(styles, /@keyframes cat-call/);
+  assert.match(main, /remind: animationAsset\(id, "remind", 12, true\)/);
+  assert.match(main, /action === "remind" \? "generated-fringe"/);
+  assert.match(player, /cleanGeneratedFringe/);
+  assert.doesNotMatch(styles, /data-action="remind"[^}]*\.pet-sprite[^}]*animation:/);
+  assert.doesNotMatch(styles, /@keyframes dog-alert-hop/);
+  assert.doesNotMatch(styles, /@keyframes cat-alert-hop/);
+  for (const pet of ["alaskan", "shepherd", "siamese", "maine-coon"]) {
+    const timeline = petActionTimelines[pet].remind;
+    assert.ok(timeline.reduce((total, step) => total + step.durationMs, 0) >= 2_200, `${pet}/remind should include a calm pause between calls`);
+    assert.ok(timeline.some(({ frame }) => frame === 2 || frame === 6), `${pet}/remind should reach a clearly open-mouth frame`);
+    const png = readFileSync(new URL(`../src/assets/pets/${pet}/animations/remind.png`, import.meta.url));
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    assert.equal(width, height, `${pet}/remind sprite sheet must be square`);
+    assert.equal(width % 4, 0, `${pet}/remind sprite sheet must divide into exact grid cells`);
+    assert.equal(png[25], 6, `${pet}/remind sprite sheet must retain an alpha channel`);
+  }
   assert.match(zh, /acknowledgeReminder: "知道了"/);
   assert.match(en, /acknowledgeReminder: "Got it"/);
 });

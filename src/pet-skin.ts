@@ -15,7 +15,7 @@ export type PetAnimationAsset = {
   blendFrames?: boolean;
   frameMap?: number[];
   timeline?: AnimationFrameStep[];
-  edgeCleanup?: "green-fringe";
+  edgeCleanup?: "green-fringe" | "generated-fringe";
 };
 
 export const animationDurationMs = (asset: PetAnimationAsset) => asset.timeline?.reduce(
