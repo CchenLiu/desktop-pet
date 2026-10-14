@@ -279,6 +279,12 @@ test("settings supporting text is at least eleven pixels", () => {
   }
 });
 
+test("settings appearance heading does not render a numbered kicker", () => {
+  const main = read("src/main.ts");
+
+  assert.doesNotMatch(main, /<span class="section-kicker">01<\/span>/);
+});
+
 test("settings expansion preserves the collapsed pet position and restores it on close", () => {
   const main = read("src/main.ts");
 

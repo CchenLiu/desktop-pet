@@ -255,7 +255,7 @@ document.body.innerHTML = `
         </section>
 
         <section class="panel-section">
-          <div class="section-heading"><div><span class="section-kicker">01</span><h2>${t("settings.appearanceTitle")}</h2><p>${t("settings.appearanceHint")}</p></div></div>
+          <div class="section-heading"><div><h2>${t("settings.appearanceTitle")}</h2><p>${t("settings.appearanceHint")}</p></div></div>
           <div class="form-grid">
             <div><label class="field-label" for="pet-select">${t("settings.petAppearance")}</label><select class="field" id="pet-select"></select></div>
             <div><label class="field-label" for="language-input">${t("settings.language")}</label><select class="field" id="language-input">${localeOptions.map(({ value, labelKey }) => `<option value="${value}">${t(labelKey)}</option>`).join("")}</select></div>
