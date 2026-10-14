@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc --noEmit && vite build",
     "test:ui": "node --test tests/ui-contract.test.mjs",
+    "test:sprites": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/audit-sprite-alignment.ps1 -EnforceReminder",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
