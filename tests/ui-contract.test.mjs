@@ -285,6 +285,16 @@ test("settings appearance heading does not render a numbered kicker", () => {
   assert.doesNotMatch(main, /<span class="section-kicker">01<\/span>/);
 });
 
+test("autostart setting does not render a default-off hint", () => {
+  const main = read("src/main.ts");
+  const zh = read("src/i18n/zh-CN.ts");
+  const en = read("src/i18n/en-US.ts");
+
+  assert.doesNotMatch(main, /settings\.autostartHint/);
+  assert.doesNotMatch(zh, /autostartHint/);
+  assert.doesNotMatch(en, /autostartHint/);
+});
+
 test("settings expansion preserves the collapsed pet position and restores it on close", () => {
   const main = read("src/main.ts");
 

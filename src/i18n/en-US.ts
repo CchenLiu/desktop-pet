@@ -50,7 +50,6 @@ const enUS = {
     petSize: "Pet size",
     alwaysOnTop: "Always on top",
     autostart: "Start with Windows",
-    autostartHint: "Off by default",
     reduceMotion: "Reduce motion",
     language: "Interface language",
     reminderTip: "Reminders continue while the pet is hidden and stop when the app exits.",

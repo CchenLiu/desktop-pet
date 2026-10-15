@@ -264,7 +264,7 @@ document.body.innerHTML = `
           <input class="range" id="size-input" type="range" min="48" max="220" step="4" />
           <div class="switch-stack">
             <label class="switch-row"><span>${t("settings.alwaysOnTop")}</span><span class="switch"><input id="always-top-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
-            <label class="switch-row"><span>${t("settings.autostart")}<small>${t("settings.autostartHint")}</small></span><span class="switch"><input id="autostart-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
+            <label class="switch-row"><span>${t("settings.autostart")}</span><span class="switch"><input id="autostart-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
             <label class="switch-row"><span>${t("settings.reduceMotion")}</span><span class="switch"><input id="reduce-motion-input" type="checkbox" /><span aria-hidden="true"></span></span></label>
           </div>
         </section>

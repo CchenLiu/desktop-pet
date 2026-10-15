@@ -50,7 +50,6 @@ const zhCN = {
     petSize: "桌宠尺寸",
     alwaysOnTop: "始终置顶",
     autostart: "开机自启",
-    autostartHint: "默认关闭",
     reduceMotion: "减少动画",
     language: "界面语言",
     reminderTip: "提醒会在桌宠隐藏时继续运行；退出应用后停止。",
