@@ -3,6 +3,7 @@ name = "desktop-pet"
 version = "0.0.1"
 description = "A lightweight Windows desktop pet"
 authors = ["Desktop Pet"]
+license = "MIT"
 edition = "2021"
 
 [lib]

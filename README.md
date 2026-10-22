@@ -17,6 +17,8 @@
     <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?logo=windows&logoColor=white&style=flat-square">
     <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white&style=flat-square">
     <img alt="Rust" src="https://img.shields.io/badge/Rust-powered-000000?logo=rust&logoColor=white&style=flat-square">
+    <img alt="Code license: MIT" src="https://img.shields.io/badge/code-MIT-3C3C3C?style=flat-square">
+    <img alt="Art license: CC BY-NC 4.0" src="https://img.shields.io/badge/art-CC%20BY--NC%204.0-B36A45?style=flat-square">
   </p>
 </div>
 
@@ -119,4 +121,10 @@ docs/                动画资源和皮肤协议设计文档
 
 欢迎通过 [Issues](https://github.com/baichenliu1/desktop-pet/issues) 报告问题、提出功能建议或讨论新的宠物动作。提交代码前，请确保 UI 测试和精灵图对齐检查通过。
 
-> 当前仓库尚未声明开源许可证。公开源代码不等于自动授予复制、修改或再分发权利。
+## 许可证
+
+- 除原创视觉素材外，源代码、配置、文档和构建脚本采用 [MIT License](LICENSE)。
+- 宠物形象、动画、概念图和应用图标采用 [CC BY-NC 4.0](ASSET_LICENSE.md)，允许署名分享和改编，但不得用于商业用途。
+- 第三方依赖继续遵循各自的许可证。
+
+因此，本项目是“代码开源、原创视觉素材单独授权”，根目录 MIT 许可证不覆盖 `ASSET_LICENSE.md` 列出的素材。
